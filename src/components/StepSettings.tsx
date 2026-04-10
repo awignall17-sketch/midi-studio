@@ -37,7 +37,7 @@ export function StepSettings({ step, rect, onUpdate, onClose, type }: Props) {
         
         {type === 'melodic' && (
           <div className="flex flex-col gap-2">
-            <label className="text-[10px] font-mono text-[#8E9299]">PITCH</label>
+            <label className="text-[0.625rem] font-mono text-[#8E9299]">PITCH</label>
             <div className="flex gap-2">
               <select 
                 className="bg-[#242424] text-white text-xs p-1 rounded border border-[#333] flex-1 outline-none focus:border-[#FF4444]"
@@ -58,7 +58,7 @@ export function StepSettings({ step, rect, onUpdate, onClose, type }: Props) {
         )}
 
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] font-mono text-[#8E9299]">VELOCITY ({Math.round(step.velocity * 100)}%)</label>
+          <label className="text-[0.625rem] font-mono text-[#8E9299]">VELOCITY ({Math.round(step.velocity * 100)}%)</label>
           <input 
             type="range" 
             min="0" max="1" step="0.05" 
@@ -69,7 +69,7 @@ export function StepSettings({ step, rect, onUpdate, onClose, type }: Props) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] font-mono text-[#8E9299]">DURATION (STRETCH)</label>
+          <label className="text-[0.625rem] font-mono text-[#8E9299]">DURATION (STRETCH)</label>
           <select 
             className="bg-[#242424] text-white text-xs p-1 rounded border border-[#333] outline-none focus:border-[#FF4444]"
             value={step.duration}
@@ -84,7 +84,7 @@ export function StepSettings({ step, rect, onUpdate, onClose, type }: Props) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] font-mono text-[#8E9299]">STEP SPAN (HOLD)</label>
+          <label className="text-[0.625rem] font-mono text-[#8E9299]">STEP SPAN (HOLD)</label>
           <div className="flex items-center gap-2">
             <input 
               type="range" 
@@ -98,7 +98,7 @@ export function StepSettings({ step, rect, onUpdate, onClose, type }: Props) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] font-mono text-[#8E9299]">MICRO-TIMING (MOVE)</label>
+          <label className="text-[0.625rem] font-mono text-[#8E9299]">MICRO-TIMING (MOVE)</label>
           <input 
             type="range" 
             min="-0.5" max="0.5" step="0.05" 

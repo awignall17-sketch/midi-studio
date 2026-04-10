@@ -6,6 +6,17 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+html {
+  /* Increase base font size to scale up the entire UI proportionally */
+  font-size: 18px;
+}
+
+@media (min-width: 1536px) {
+  html {
+    font-size: 22px;
+  }
+}
+
 body {
   background-color: #151619;
   color: #ffffff;

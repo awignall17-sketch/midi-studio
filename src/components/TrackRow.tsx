@@ -190,7 +190,7 @@ export const TrackRow = React.memo(function TrackRow({
         </div>
         {track.instrument === 'sampler' && (
           <div className="mt-1 flex flex-col gap-1">
-            <label className="flex items-center justify-center gap-1 bg-[#1a1a1a] hover:bg-[#333] border border-[#333] rounded p-1 cursor-pointer text-[10px] text-[#8E9299] hover:text-white transition-colors">
+            <label className="flex items-center justify-center gap-1 bg-[#1a1a1a] hover:bg-[#333] border border-[#333] rounded p-1 cursor-pointer text-[0.625rem] text-[#8E9299] hover:text-white transition-colors">
               <Upload className="w-3 h-3" />
               <span>{track.sampleUrl ? 'CHANGE SAMPLE' : 'UPLOAD SAMPLE'}</span>
               <input type="file" accept="audio/*" className="hidden" onChange={(e) => onSampleUpload(trackIndex, e)} />
@@ -198,11 +198,11 @@ export const TrackRow = React.memo(function TrackRow({
             {track.sampleUrl && (
               <div className="flex items-center gap-2">
                 <div className="flex-1 flex items-center gap-1">
-                  <span className="text-[9px] font-bold text-[#8E9299] w-8" title="Base pitch of the sample">ROOT</span>
+                  <span className="text-[0.5625rem] font-bold text-[#8E9299] w-8" title="Base pitch of the sample">ROOT</span>
                   <select
                     value={track.sampleRootNote || 'C4'}
                     onChange={(e) => onUpdateTrack(trackIndex, { sampleRootNote: e.target.value })}
-                    className="flex-1 bg-[#1a1a1a] text-white text-[10px] p-0.5 rounded border border-[#333] focus:outline-none focus:border-[#FF4444]"
+                    className="flex-1 bg-[#1a1a1a] text-white text-[0.625rem] p-0.5 rounded border border-[#333] focus:outline-none focus:border-[#FF4444]"
                   >
                     {['C2', 'C3', 'C4', 'C5', 'C6'].map(note => (
                       <option key={note} value={note}>{note}</option>
@@ -210,11 +210,11 @@ export const TrackRow = React.memo(function TrackRow({
                   </select>
                 </div>
                 <div className="flex-1 flex items-center gap-1">
-                  <span className="text-[9px] font-bold text-[#8E9299] w-8" title="Note placed in sequencer">NOTE</span>
+                  <span className="text-[0.5625rem] font-bold text-[#8E9299] w-8" title="Note placed in sequencer">NOTE</span>
                   <select
                     value={track.defaultNote || 'C4'}
                     onChange={(e) => onUpdateTrack(trackIndex, { defaultNote: e.target.value })}
-                    className="flex-1 bg-[#1a1a1a] text-white text-[10px] p-0.5 rounded border border-[#333] focus:outline-none focus:border-[#FF4444]"
+                    className="flex-1 bg-[#1a1a1a] text-white text-[0.625rem] p-0.5 rounded border border-[#333] focus:outline-none focus:border-[#FF4444]"
                   >
                     {['C2', 'C3', 'C4', 'C5', 'C6'].map(note => (
                       <option key={note} value={note}>{note}</option>
@@ -226,7 +226,7 @@ export const TrackRow = React.memo(function TrackRow({
             {track.sampleUrl && (
               <div className="flex items-center gap-2 mt-1">
                 <div className="flex-1 flex items-center gap-1">
-                  <span className="text-[9px] font-bold text-[#8E9299] w-8">SPEED</span>
+                  <span className="text-[0.5625rem] font-bold text-[#8E9299] w-8">SPEED</span>
                   <input
                     type="range" min="0.1" max="4" step="0.1" value={track.samplePlaybackSpeed || 1}
                     onChange={e => onUpdateTrack(trackIndex, { samplePlaybackSpeed: parseFloat(e.target.value) }, true)}
@@ -236,7 +236,7 @@ export const TrackRow = React.memo(function TrackRow({
                 </div>
                 <button
                   onClick={() => onUpdateTrack(trackIndex, { sampleReverse: !track.sampleReverse }, true)}
-                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${track.sampleReverse ? 'bg-[#FF4444] text-white' : 'bg-[#2A2B30] text-[#8E9299]'}`}
+                  className={`text-[0.5625rem] font-bold px-1.5 py-0.5 rounded ${track.sampleReverse ? 'bg-[#FF4444] text-white' : 'bg-[#2A2B30] text-[#8E9299]'}`}
                 >
                   REV
                 </button>
@@ -245,14 +245,14 @@ export const TrackRow = React.memo(function TrackRow({
             {track.sampleUrl && (
               <div className="flex items-center gap-2 mt-1">
                 <div className="flex-1 flex items-center gap-1">
-                  <span className="text-[9px] font-bold text-[#8E9299] w-8">DUR</span>
+                  <span className="text-[0.5625rem] font-bold text-[#8E9299] w-8">DUR</span>
                   <input
                     type="range" min="0.1" max="10" step="0.1" value={track.sampleDuration || 1}
                     onChange={e => onUpdateTrack(trackIndex, { sampleDuration: parseFloat(e.target.value) }, true)}
                     onPointerDown={() => onCommitHistory()}
                     className="custom-slider w-full" style={{ '--thumb-color': '#FF4444' } as any}
                   />
-                  <span className="text-[9px] font-mono text-[#8E9299] w-6 text-right">{track.sampleDuration || 1}s</span>
+                  <span className="text-[0.5625rem] font-mono text-[#8E9299] w-6 text-right">{track.sampleDuration || 1}s</span>
                 </div>
                 <label className="flex items-center gap-1 cursor-pointer">
                   <input
@@ -261,7 +261,7 @@ export const TrackRow = React.memo(function TrackRow({
                     onChange={e => onUpdateTrack(trackIndex, { sampleFade: e.target.checked })}
                     className="w-3 h-3 accent-[#FF4444]"
                   />
-                  <span className="text-[9px] font-bold text-[#8E9299]">FADE</span>
+                  <span className="text-[0.5625rem] font-bold text-[#8E9299]">FADE</span>
                 </label>
               </div>
             )}
@@ -269,7 +269,7 @@ export const TrackRow = React.memo(function TrackRow({
         )}
         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-0.5">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-[#8E9299] w-8">VOL</span>
+            <span className="text-[0.625rem] font-bold text-[#8E9299] w-8">VOL</span>
             <input 
               type="range" min="-60" max="6" value={track.volume} 
               onChange={e => onUpdateTrack(trackIndex, { volume: parseFloat(e.target.value) }, true)} 
@@ -278,7 +278,7 @@ export const TrackRow = React.memo(function TrackRow({
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-[#8E9299] w-8">PAN</span>
+            <span className="text-[0.625rem] font-bold text-[#8E9299] w-8">PAN</span>
             <input 
               type="range" min="-1" max="1" step="0.1" value={track.pan} 
               onChange={e => onUpdateTrack(trackIndex, { pan: parseFloat(e.target.value) }, true)} 
@@ -287,7 +287,7 @@ export const TrackRow = React.memo(function TrackRow({
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-[#8E9299] w-8">ECHO</span>
+            <span className="text-[0.625rem] font-bold text-[#8E9299] w-8">ECHO</span>
             <input 
               type="range" min="0" max="1" step="0.05" value={track.delayWet} 
               onChange={e => onUpdateTrack(trackIndex, { delayWet: parseFloat(e.target.value) }, true)} 
@@ -296,7 +296,7 @@ export const TrackRow = React.memo(function TrackRow({
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-[#8E9299] w-8">VERB</span>
+            <span className="text-[0.625rem] font-bold text-[#8E9299] w-8">VERB</span>
             <input 
               type="range" min="0" max="1" step="0.05" value={track.reverbWet} 
               onChange={e => onUpdateTrack(trackIndex, { reverbWet: parseFloat(e.target.value) }, true)} 
@@ -305,7 +305,7 @@ export const TrackRow = React.memo(function TrackRow({
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-[#8E9299] w-8">DIST</span>
+            <span className="text-[0.625rem] font-bold text-[#8E9299] w-8">DIST</span>
             <input 
               type="range" min="0" max="1" step="0.05" value={track.distWet} 
               onChange={e => onUpdateTrack(trackIndex, { distWet: parseFloat(e.target.value) }, true)} 
@@ -314,7 +314,7 @@ export const TrackRow = React.memo(function TrackRow({
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-[#8E9299] w-8">CHOR</span>
+            <span className="text-[0.625rem] font-bold text-[#8E9299] w-8">CHOR</span>
             <input 
               type="range" min="0" max="1" step="0.05" value={track.chorusWet} 
               onChange={e => onUpdateTrack(trackIndex, { chorusWet: parseFloat(e.target.value) }, true)} 
@@ -323,7 +323,7 @@ export const TrackRow = React.memo(function TrackRow({
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-[#8E9299] w-8">CRSH</span>
+            <span className="text-[0.625rem] font-bold text-[#8E9299] w-8">CRSH</span>
             <input 
               type="range" min="0" max="1" step="0.05" value={track.bitcrusherWet} 
               onChange={e => onUpdateTrack(trackIndex, { bitcrusherWet: parseFloat(e.target.value) }, true)} 
@@ -332,7 +332,7 @@ export const TrackRow = React.memo(function TrackRow({
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-[#8E9299] w-8">SWING</span>
+            <span className="text-[0.625rem] font-bold text-[#8E9299] w-8">SWING</span>
             <input 
               type="range" min="0" max="1" step="0.05" value={track.swing} 
               onChange={e => onUpdateTrack(trackIndex, { swing: parseFloat(e.target.value) }, true)} 
@@ -341,7 +341,7 @@ export const TrackRow = React.memo(function TrackRow({
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-[#8E9299] w-8">STEPS</span>
+            <span className="text-[0.625rem] font-bold text-[#8E9299] w-8">STEPS</span>
             <input 
               type="number" min="1" max={bars * 16} value={track.stepsCount || bars * 16} 
               onChange={e => onUpdateTrack(trackIndex, { stepsCount: parseInt(e.target.value) || bars * 16 })} 

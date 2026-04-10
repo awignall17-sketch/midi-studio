@@ -1012,7 +1012,7 @@ export default function App() {
 
   return (
     <div className="h-screen bg-gradient-to-br from-[#0a0a0c] to-[#151619] text-white font-mono p-4 sm:p-6 select-none flex flex-col overflow-hidden">
-      <div className="w-full h-full mx-auto flex flex-col gap-4 sm:gap-6">
+      <div className="w-full max-w-6xl h-full mx-auto flex flex-col gap-4 sm:gap-6">
         
         {/* Header & Transport */}
         <div className="flex flex-col gap-4 bg-[#1a1b20] p-4 sm:p-6 rounded-xl border border-[#2a2b30] shadow-2xl">
@@ -1090,7 +1090,7 @@ export default function App() {
                       }
                     }
                   }}
-                  className="p-1 px-2 text-[10px] font-bold text-[#8E9299] hover:text-white bg-[#242424] border border-[#333] rounded transition-colors"
+                  className="p-1 px-2 text-[0.625rem] font-bold text-[#8E9299] hover:text-white bg-[#242424] border border-[#333] rounded transition-colors"
                   title="Tap Tempo"
                 >
                   TAP
@@ -1098,7 +1098,7 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-2 bg-[#1a1a1a] p-1.5 rounded-lg border border-[#333]">
-                <span className="text-[10px] text-[#8E9299] font-bold px-2">SWING</span>
+                <span className="text-[0.625rem] text-[#8E9299] font-bold px-2">SWING</span>
                 <input 
                   type="range" min="0" max="1" step="0.05" value={swing}
                   onChange={e => setSwing(parseFloat(e.target.value))}
@@ -1107,7 +1107,7 @@ export default function App() {
               </div>
 
               <div className="flex items-center gap-2 bg-[#1a1a1a] p-1.5 rounded-lg border border-[#333]">
-                <span className="text-[10px] text-[#8E9299] font-bold px-2">BARS</span>
+                <span className="text-[0.625rem] text-[#8E9299] font-bold px-2">BARS</span>
                 <input 
                   type="number" 
                   min="1" max="128" 
@@ -1228,7 +1228,7 @@ export default function App() {
             <span className="text-xs font-bold text-[#8E9299] mr-2 shrink-0">MASTER FX</span>
             
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">VOL</span>
+              <span className="text-[0.625rem] text-[#8E9299]">VOL</span>
               <input 
                 type="range" min="-60" max="6" step="1" value={masterVolume}
                 onChange={e => setMasterVolume(parseFloat(e.target.value))}
@@ -1238,7 +1238,7 @@ export default function App() {
             <div className="w-px h-4 bg-[#333] shrink-0 mx-1"></div>
             
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">ECHO</span>
+              <span className="text-[0.625rem] text-[#8E9299]">ECHO</span>
               <input 
                 type="range" min="0" max="1" step="0.05" value={delayWet}
                 onChange={e => setDelayWet(parseFloat(e.target.value))}
@@ -1246,7 +1246,7 @@ export default function App() {
               />
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">VERB</span>
+              <span className="text-[0.625rem] text-[#8E9299]">VERB</span>
               <input 
                 type="range" min="0" max="1" step="0.05" value={reverbWet}
                 onChange={e => setReverbWet(parseFloat(e.target.value))}
@@ -1254,7 +1254,7 @@ export default function App() {
               />
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">DIST</span>
+              <span className="text-[0.625rem] text-[#8E9299]">DIST</span>
               <input 
                 type="range" min="0" max="1" step="0.05" value={distWet}
                 onChange={e => setDistWet(parseFloat(e.target.value))}
@@ -1262,7 +1262,7 @@ export default function App() {
               />
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">CHOR</span>
+              <span className="text-[0.625rem] text-[#8E9299]">CHOR</span>
               <input 
                 type="range" min="0" max="1" step="0.05" value={masterChorusWet}
                 onChange={e => setMasterChorusWet(parseFloat(e.target.value))}
@@ -1270,7 +1270,7 @@ export default function App() {
               />
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">CRSH</span>
+              <span className="text-[0.625rem] text-[#8E9299]">CRSH</span>
               <input 
                 type="range" min="0" max="1" step="0.05" value={masterBitcrusherWet}
                 onChange={e => setMasterBitcrusherWet(parseFloat(e.target.value))}
@@ -1278,7 +1278,7 @@ export default function App() {
               />
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">LPF</span>
+              <span className="text-[0.625rem] text-[#8E9299]">LPF</span>
               <input 
                 type="range" min="20" max="20000" step="1" value={masterFilterFreq}
                 onChange={e => setMasterFilterFreq(parseFloat(e.target.value))}
@@ -1286,7 +1286,7 @@ export default function App() {
               />
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">HPF</span>
+              <span className="text-[0.625rem] text-[#8E9299]">HPF</span>
               <input 
                 type="range" min="20" max="20000" step="1" value={masterHPFFreq}
                 onChange={e => setMasterHPFFreq(parseFloat(e.target.value))}
@@ -1296,7 +1296,7 @@ export default function App() {
             <div className="w-px h-4 bg-[#333] shrink-0 mx-1"></div>
 
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">COMP THR</span>
+              <span className="text-[0.625rem] text-[#8E9299]">COMP THR</span>
               <input 
                 type="range" min="-60" max="0" step="1" value={masterCompThreshold}
                 onChange={e => setMasterCompThreshold(parseFloat(e.target.value))}
@@ -1304,7 +1304,7 @@ export default function App() {
               />
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">RATIO</span>
+              <span className="text-[0.625rem] text-[#8E9299]">RATIO</span>
               <input 
                 type="range" min="1" max="20" step="1" value={masterCompRatio}
                 onChange={e => setMasterCompRatio(parseFloat(e.target.value))}
@@ -1314,7 +1314,7 @@ export default function App() {
             <div className="w-px h-4 bg-[#333] shrink-0 mx-1"></div>
 
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">LOW</span>
+              <span className="text-[0.625rem] text-[#8E9299]">LOW</span>
               <input 
                 type="range" min="-24" max="12" step="1" value={masterEqLow}
                 onChange={e => setMasterEqLow(parseFloat(e.target.value))}
@@ -1322,7 +1322,7 @@ export default function App() {
               />
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">MID</span>
+              <span className="text-[0.625rem] text-[#8E9299]">MID</span>
               <input 
                 type="range" min="-24" max="12" step="1" value={masterEqMid}
                 onChange={e => setMasterEqMid(parseFloat(e.target.value))}
@@ -1330,7 +1330,7 @@ export default function App() {
               />
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] text-[#8E9299]">HIGH</span>
+              <span className="text-[0.625rem] text-[#8E9299]">HIGH</span>
               <input 
                 type="range" min="-24" max="12" step="1" value={masterEqHigh}
                 onChange={e => setMasterEqHigh(parseFloat(e.target.value))}
@@ -1347,15 +1347,15 @@ export default function App() {
               {/* Timeline Header */}
               <div className="flex border-b border-[#2a2b30] sticky top-0 z-20 bg-[#151619]">
                 <div className="w-72 sm:w-80 flex-shrink-0 sticky left-0 z-30 bg-[#151619] p-2 sm:p-3 border-r border-[#2a2b30] shadow-[4px_0_10px_rgba(0,0,0,0.3)] flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-[#8E9299] tracking-widest">TIMELINE</span>
-                  <span className="text-[10px] font-bold text-[#666]">{bars} BARS</span>
+                  <span className="text-[0.625rem] font-bold text-[#8E9299] tracking-widest">TIMELINE</span>
+                  <span className="text-[0.625rem] font-bold text-[#666]">{bars} BARS</span>
                 </div>
                 <div className="flex items-center p-3 sm:p-4 bg-[#151619] relative">
                   {Array.from({ length: bars * 16 }).map((_, stepIndex) => (
                     <React.Fragment key={stepIndex}>
                       {stepIndex > 0 && stepIndex % 16 === 0 && <div className="h-full w-px bg-transparent mx-2 sm:mx-3 flex-shrink-0"></div>}
                       <div className={`flex-shrink-0 w-8 sm:w-10 flex justify-center relative step-container step-container-${stepIndex} ${stepIndex % 4 === 0 && stepIndex % 16 !== 0 ? "ml-2 sm:ml-3" : "ml-1 sm:ml-1.5"}`}>
-                        <span className={`text-[10px] font-bold timeline-text text-[#666]`}>
+                        <span className={`text-[0.625rem] font-bold timeline-text text-[#666]`}>
                           {stepIndex % 4 === 0 ? (stepIndex / 4) + 1 : ''}
                         </span>
                         <div className="playhead-indicator absolute -top-3 sm:-top-4 left-1/2 -translate-x-1/2 w-0.5 bg-[#FF4444] opacity-80 z-10 pointer-events-none shadow-[0_0_8px_#FF4444]" />
