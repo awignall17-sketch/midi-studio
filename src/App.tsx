@@ -1012,7 +1012,7 @@ export default function App() {
 
   return (
     <div className="h-screen bg-gradient-to-br from-[#0a0a0c] to-[#151619] text-white font-mono p-4 sm:p-6 select-none flex flex-col overflow-hidden">
-      <div className="w-full max-w-6xl h-full mx-auto flex flex-col gap-4 sm:gap-6">
+      <div className="w-full h-full mx-auto flex flex-col gap-4 sm:gap-6">
         
         {/* Header & Transport */}
         <div className="flex flex-col gap-4 bg-[#1a1b20] p-4 sm:p-6 rounded-xl border border-[#2a2b30] shadow-2xl">
