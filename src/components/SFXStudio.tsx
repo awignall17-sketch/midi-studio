@@ -4,6 +4,27 @@ import { Mp3Encoder } from '@breezystack/lamejs';
 import { Play, Square, Download, ArrowLeft, Circle, BookOpen, X } from 'lucide-react';
 import { audioBufferToWav } from '../utils';
 
+export type SFXSnapshot = {
+  synthType: string;
+  oscType: string;
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+  pitch: string;
+  pitchDecay: number;
+  pitchSweep: 'none' | 'up' | 'down';
+  sweepTime: number;
+  noiseType: string;
+  noiseMix: number;
+  subMix: number;
+};
+
+export type SFXStep = {
+  active: boolean;
+  lockedState?: SFXSnapshot;
+};
+
 export default function SFXStudio({ onBack }: { onBack: () => void }) {
   const [synthType, setSynthType] = useState('synth');
   const [oscType, setOscType] = useState('sine');
@@ -70,7 +91,7 @@ export default function SFXStudio({ onBack }: { onBack: () => void }) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   
-  const [sequence, setSequence] = useState<boolean[]>(Array(8).fill(false));
+  const [sequence, setSequence] = useState<SFXStep[]>(Array(8).fill({ active: false }));
   const [isPlayingSeq, setIsPlayingSeq] = useState(false);
   const [seqBpm, setSeqBpm] = useState(120);
   const seqRef = useRef<Tone.Sequence | null>(null);
@@ -304,8 +325,12 @@ export default function SFXStudio({ onBack }: { onBack: () => void }) {
         }
       }, time);
       
-      if (sequence[stepIndex]) {
-        playSound(time);
+      if (sequence[stepIndex]?.active) {
+        if (sequence[stepIndex].lockedState) {
+          playSnapshot(sequence[stepIndex].lockedState, time);
+        } else {
+          playSound(time);
+        }
       }
     }, Array.from({ length: 8 }, (_, i) => i), "8n");
     
@@ -317,6 +342,60 @@ export default function SFXStudio({ onBack }: { onBack: () => void }) {
       if (seqRef.current) seqRef.current.dispose();
     };
   }, [sequence, isPlayingSeq, synthType, oscType, attack, decay, sustain, release, pitch, pitchSweep, sweepTime, noiseType, pitchDecay]);
+
+  const playSnapshot = (snap: SFXSnapshot, time: number) => {
+    if (!vibratoRef.current) return;
+    
+    const envelope = { attack: Math.max(0.005, snap.attack), decay: Math.max(0.01, snap.decay), sustain: snap.sustain, release: Math.max(0.01, snap.release) };
+    let tempSynth: any;
+    let tempNoise: any;
+    let tempSub: any;
+
+    try {
+      switch (snap.synthType) {
+        case 'synth': tempSynth = new Tone.Synth({ oscillator: { type: snap.oscType as any }, envelope }).connect(vibratoRef.current); break;
+        case 'fm': tempSynth = new Tone.FMSynth({ oscillator: { type: snap.oscType as any }, envelope }).connect(vibratoRef.current); break;
+        case 'am': tempSynth = new Tone.AMSynth({ oscillator: { type: snap.oscType as any }, envelope }).connect(vibratoRef.current); break;
+        case 'membrane': tempSynth = new Tone.MembraneSynth({ pitchDecay: snap.pitchDecay, oscillator: { type: snap.oscType as any }, envelope }).connect(vibratoRef.current); break;
+        case 'noise': tempSynth = new Tone.NoiseSynth({ noise: { type: snap.noiseType as any }, envelope }).connect(vibratoRef.current); break;
+        case 'metal': tempSynth = new Tone.MetalSynth({ envelope }).connect(vibratoRef.current); break;
+      }
+      
+      if (snap.noiseMix > 0) {
+        tempNoise = new Tone.NoiseSynth({ noise: { type: snap.noiseType as any }, envelope, volume: Tone.gainToDb(snap.noiseMix) }).connect(vibratoRef.current);
+      }
+      if (snap.subMix > 0) {
+        tempSub = new Tone.MembraneSynth({ pitchDecay: 0.05, oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 }, volume: Tone.gainToDb(snap.subMix) }).connect(vibratoRef.current);
+      }
+
+      if (snap.synthType === 'noise' || snap.synthType === 'metal') {
+        tempSynth.triggerAttackRelease('16n', time);
+      } else {
+        const freq = Tone.Frequency(snap.pitch).toFrequency();
+        try { tempSynth.frequency.setValueAtTime(freq, time); } catch(e){}
+        tempSynth.triggerAttackRelease(snap.pitch, '16n', time);
+        
+        if (snap.pitchSweep === 'up') {
+          tempSynth.frequency.linearRampToValueAtTime(Tone.Frequency(snap.pitch).transpose(24).toFrequency(), time + snap.sweepTime);
+        } else if (snap.pitchSweep === 'down') {
+          tempSynth.frequency.linearRampToValueAtTime(Tone.Frequency(snap.pitch).transpose(-24).toFrequency(), time + snap.sweepTime);
+        }
+      }
+
+      if (tempNoise) tempNoise.triggerAttackRelease('16n', time);
+      if (tempSub) tempSub.triggerAttackRelease('C2', '16n', time);
+
+      // Clean up synths after plays
+      const duration = (snap.attack + snap.decay + snap.release + 2) * 1000;
+      setTimeout(() => {
+        tempSynth?.dispose();
+        tempNoise?.dispose();
+        tempSub?.dispose();
+      }, duration);
+    } catch (e) {
+      console.warn("Failed to play snapshot", e);
+    }
+  };
 
   const playSound = async (time?: number | React.MouseEvent) => {
     if (Tone.context.state !== 'running') {
@@ -507,7 +586,16 @@ export default function SFXStudio({ onBack }: { onBack: () => void }) {
         setSynthType('fm'); setOscType('sine'); setAttack(0.05); setDecay(0.5); setSustain(0.2); setRelease(0.5); setPitch('C4'); setPitchSweep('up'); setSweepTime(0.4); setFilterFreq(5000); setFxDelay(0.3); setFxReverb(0.2); setFxDist(0); setFxBitcrush(0); setVibratoDepth(0);
         break;
       case 'explosion':
-        setSynthType('noise'); setNoiseType('brown'); setAttack(0.01); setDecay(0.5); setSustain(0.1); setRelease(1.5); setFilterFreq(800); setFilterRes(0); setFxDist(0.5); setFxBitcrush(0); setFxDelay(0); setFxReverb(0.2); setVibratoDepth(0); setNoiseMix(0.8); setSubMix(1); setEqLow(15); setEqHigh(5); setCompThreshold(-50); setCompRatio(12);
+        setSynthType('noise'); setNoiseType('brown'); setAttack(0.005); setDecay(0.4); setSustain(0.1); setRelease(2.0); setFilterFreq(600); setFilterRes(0); setFxDist(0.8); setFxBitcrush(0.3); setFxDelay(0.1); setFxReverb(0.4); setVibratoDepth(0); setNoiseMix(0.9); setSubMix(1); setEqLow(18); setEqHigh(2); setCompThreshold(-40); setCompRatio(14); setFxTremoloDepth(0.4); setFxTremoloFreq(20);
+        break;
+      case 'water':
+        setSynthType('noise'); setNoiseType('pink'); setAttack(0.2); setDecay(0.8); setSustain(0.5); setRelease(1.5); setFilterFreq(1200); setFilterRes(6); setFxAutoFilter(0.9); setFxChorus(0.6); setFxPhaser(0.5); setFxDelay(0.4); setFxReverb(0.5); setFxDist(0); setFxBitcrush(0); setVibratoDepth(0); setNoiseMix(1); setSubMix(0); setFxTremoloFreq(5);
+        break;
+      case 'magic':
+        setSynthType('fm'); setOscType('sine'); setAttack(0.1); setDecay(0.5); setSustain(0.4); setRelease(2.0); setPitch('C5'); setPitchSweep('up'); setSweepTime(0.8); setFilterFreq(10000); setFilterRes(2); setFxAutoFilter(0); setFxChorus(0.6); setFxPhaser(0.8); setFxDelay(0.4); setFxReverb(0.8); setFxTremoloDepth(0.6); setFxTremoloFreq(15); setVibratoDepth(0.2); setNoiseMix(0.2); setNoiseType('white'); setSubMix(0);
+        break;
+      case 'wind':
+        setSynthType('noise'); setNoiseType('pink'); setAttack(1.5); setDecay(1); setSustain(1); setRelease(3); setFilterFreq(1000); setFilterRes(1.5); setFxAutoFilter(0.7); setFxPhaser(0.6); setFxChorus(0); setFxDelay(0); setFxReverb(0.6); setFxDist(0); setFxBitcrush(0); setVibratoDepth(0); setNoiseMix(1); setSubMix(0.1); setFxTremoloFreq(0.5); setFxTremoloDepth(0.8);
         break;
       case 'select':
         setSynthType('synth'); setOscType('sine'); setAttack(0.001); setDecay(0.1); setSustain(0); setRelease(0.1); setPitch('C6'); setPitchSweep('none'); setFilterFreq(20000); setFxDelay(0); setFxReverb(0); setFxDist(0); setFxBitcrush(0); setVibratoDepth(0);
@@ -753,6 +841,9 @@ export default function SFXStudio({ onBack }: { onBack: () => void }) {
           <button onClick={() => applyPreset('heavy_hit')} className="px-3 py-1 bg-[#2A2B30] hover:bg-[#333] rounded text-sm font-bold transition-colors">HEAVY HIT</button>
           <button onClick={() => applyPreset('powerup')} className="px-3 py-1 bg-[#2A2B30] hover:bg-[#333] rounded text-sm font-bold transition-colors">POWERUP</button>
           <button onClick={() => applyPreset('explosion')} className="px-3 py-1 bg-[#2A2B30] hover:bg-[#333] rounded text-sm font-bold transition-colors">EXPLOSION</button>
+          <button onClick={() => applyPreset('water')} className="px-3 py-1 bg-[#2A2B30] hover:bg-[#333] rounded text-sm font-bold transition-colors">WATER</button>
+          <button onClick={() => applyPreset('magic')} className="px-3 py-1 bg-[#2A2B30] hover:bg-[#333] rounded text-sm font-bold transition-colors">MAGIC</button>
+          <button onClick={() => applyPreset('wind')} className="px-3 py-1 bg-[#2A2B30] hover:bg-[#333] rounded text-sm font-bold transition-colors">WIND</button>
           <button onClick={() => applyPreset('select')} className="px-3 py-1 bg-[#2A2B30] hover:bg-[#333] rounded text-sm font-bold transition-colors">SELECT</button>
           <button onClick={() => applyPreset('click')} className="px-3 py-1 bg-[#2A2B30] hover:bg-[#333] rounded text-sm font-bold transition-colors">CLICK</button>
           <button onClick={() => applyPreset('button')} className="px-3 py-1 bg-[#2A2B30] hover:bg-[#333] rounded text-sm font-bold transition-colors">BUTTON</button>
@@ -796,21 +887,41 @@ export default function SFXStudio({ onBack }: { onBack: () => void }) {
             </div>
           </div>
           <div className="flex gap-2">
-            {sequence.map((isActive, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  const newSeq = [...sequence];
-                  newSeq[i] = !newSeq[i];
-                  setSequence(newSeq);
-                  if (newSeq[i]) {
-                    playSound();
-                  }
-                }}
-                className={`sfx-step-${i} flex-1 h-12 rounded-lg border-2 transition-all ${
-                  isActive ? 'bg-[#00AAFF] border-[#00AAFF]' : 'bg-[#151619] border-[#333] hover:border-[#555]'
-                }`}
-              />
+            {sequence.map((step, i) => (
+              <div key={i} className="flex flex-col flex-1 gap-1">
+                <button
+                  onClick={() => {
+                    const newSeq = [...sequence];
+                    newSeq[i] = { ...newSeq[i], active: !newSeq[i].active };
+                    setSequence(newSeq);
+                    if (newSeq[i].active) {
+                      newSeq[i].lockedState ? playSnapshot(newSeq[i].lockedState!, Tone.now()) : playSound();
+                    }
+                  }}
+                  className={`sfx-step-${i} h-12 rounded-lg border-2 transition-all flex items-center justify-center ${
+                    step.active ? (step.lockedState ? 'bg-[#AA00FF] border-[#AA00FF]' : 'bg-[#00AAFF] border-[#00AAFF]') : 'bg-[#151619] border-[#333] hover:border-[#555]'
+                  }`}
+                >
+                  {step.lockedState && <div className="w-2 h-2 rounded-full bg-white opacity-50"></div>}
+                </button>
+                <div className="flex gap-1 justify-center">
+                  <button 
+                    onClick={() => {
+                      const newSeq = [...sequence];
+                      if (newSeq[i].lockedState) {
+                        newSeq[i].lockedState = undefined;
+                      } else {
+                        newSeq[i].lockedState = { synthType, oscType, attack, decay, sustain, release, pitch, pitchDecay, pitchSweep, sweepTime, noiseType, noiseMix, subMix };
+                      }
+                      setSequence(newSeq);
+                    }}
+                    className={`text-[10px] px-1 py-0.5 rounded ${step.lockedState ? 'bg-[#AA00FF]/20 text-[#AA00FF]' : 'bg-[#333] text-[#8E9299] hover:text-white'}`}
+                    title={step.lockedState ? "Clear saved sound" : "Save current sound to this step"}
+                  >
+                    SAVE
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </div>

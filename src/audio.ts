@@ -6,6 +6,7 @@ class AudioEngine {
   masterEQ: Tone.EQ3;
   masterFilter: Tone.Filter;
   masterHPF: Tone.Filter;
+  stereoWidener: Tone.StereoWidener;
   delay: Tone.FeedbackDelay | null = null;
   reverb: Tone.Reverb | null = null;
   distortion: Tone.Distortion | null = null;
@@ -26,6 +27,7 @@ class AudioEngine {
     this.masterEQ = new Tone.EQ3(0, 0, 0);
     this.masterFilter = new Tone.Filter(20000, "lowpass");
     this.masterHPF = new Tone.Filter(20, "highpass");
+    this.stereoWidener = new Tone.StereoWidener(0);
     this.masterCompressor = new Tone.Compressor({
       threshold: -24,
       ratio: 4,
@@ -35,8 +37,15 @@ class AudioEngine {
     this.masterVol = new Tone.Volume(0).connect(this.masterHPF);
     this.masterHPF.connect(this.masterFilter);
     this.masterFilter.connect(this.masterEQ);
-    this.masterEQ.connect(this.masterCompressor);
+    this.masterEQ.connect(this.stereoWidener);
+    this.stereoWidener.connect(this.masterCompressor);
     this.masterCompressor.toDestination();
+  }
+
+  setHeadphoneMode(enabled: boolean) {
+    if (this.stereoWidener) {
+      this.stereoWidener.width.value = enabled ? 0.8 : 0;
+    }
   }
 
   async init() {
@@ -192,6 +201,18 @@ class AudioEngine {
       case 'brass': return new Tone.PolySynth(Tone.FMSynth, { harmonicity: 1, modulationIndex: 1, oscillator: { type: 'sawtooth' }, envelope: { attack: 0.1, decay: 0.2, sustain: 0.8, release: 0.5 } });
       case 'flute': return new Tone.PolySynth(Tone.MonoSynth, { oscillator: { type: 'sine' }, filter: { Q: 1, type: 'lowpass', rolloff: -12 }, envelope: { attack: 0.1, decay: 0.1, sustain: 1, release: 0.5 }, filterEnvelope: { attack: 0.1, decay: 0.1, sustain: 1, release: 0.5, baseFrequency: 1200, octaves: 1 } });
 
+      // CINEMATIC & ORCHESTRAL
+      case 'cinematic_brass': return new Tone.PolySynth(Tone.MonoSynth, { oscillator: { type: 'fatsawtooth', count: 4, spread: 25 }, filter: { Q: 1.5, type: 'lowpass', rolloff: -24 }, envelope: { attack: 0.2, decay: 0.3, sustain: 1, release: 1.5 }, filterEnvelope: { attack: 0.2, decay: 0.8, sustain: 0.7, release: 1.5, baseFrequency: 300, octaves: 3 }, volume: 4 });
+      case 'cinematic_strings': return new Tone.PolySynth(Tone.MonoSynth, { oscillator: { type: 'sawtooth' }, filter: { Q: 0.5, type: 'lowpass', rolloff: -12 }, envelope: { attack: 1.2, decay: 0.5, sustain: 1, release: 3 }, filterEnvelope: { attack: 1.2, decay: 0.5, sustain: 1, release: 3, baseFrequency: 500, octaves: 1 }, volume: 2 });
+      case 'taiko_drum': return new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 3, oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 0.5, sustain: 0, release: 0.5 }, volume: 8 });
+      case 'epic_choir': return new Tone.PolySynth(Tone.FMSynth, { harmonicity: 2, modulationIndex: 1.5, oscillator: { type: 'sine' }, envelope: { attack: 1.5, decay: 1, sustain: 0.7, release: 3 }, volume: 0 });
+      case 'orchestral_hit': return new Tone.PolySynth(Tone.MonoSynth, { oscillator: { type: 'fatsawtooth', count: 3, spread: 15 }, filter: { Q: 2, type: 'lowpass', rolloff: -24 }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.1, release: 0.8 }, filterEnvelope: { attack: 0.005, decay: 0.3, sustain: 0.1, release: 0.8, baseFrequency: 1000, octaves: 3 }, volume: 4 });
+      
+      // POP & ROCK
+      case 'electric_bass': return new Tone.PolySynth(Tone.MonoSynth, { oscillator: { type: 'triangle' }, filter: { Q: 1, type: 'lowpass', rolloff: -24 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.5 }, filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.4, release: 0.3, baseFrequency: 200, octaves: 2 }, volume: 6 });
+      case 'acoustic_guitar': return new Tone.PolySynth(Tone.MonoSynth, { oscillator: { type: 'sawtooth' }, filter: { Q: 2, type: 'lowpass', rolloff: -12 }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.2, release: 1 }, filterEnvelope: { attack: 0.01, decay: 0.5, sustain: 0.2, release: 1, baseFrequency: 800, octaves: 2 }, volume: 2 });
+
+
       default: return new Tone.PolySynth(Tone.Synth);
     }
   }
@@ -317,6 +338,8 @@ class AudioEngine {
         let playDuration = sampleDuration;
         if (sampleEnd > sampleStart) {
           playDuration = sampleEnd - sampleStart;
+        } else if (sampleEnd === 0 && inst.buffer) {
+          playDuration = inst.buffer.duration - sampleStart;
         }
         
         inst.start(t, sampleStart, playDuration);

@@ -26,7 +26,7 @@ export const StepButton = React.memo(function StepButton({ step, color, isActive
     
     setIsPressing(true);
     timerRef.current = setTimeout(() => {
-      if (buttonRef.current) {
+      if (buttonRef.current && isActive) {
         onOpenSettings(trackId, stepIndex, buttonRef.current.getBoundingClientRect());
       }
       setIsPressing(false);
@@ -59,7 +59,7 @@ export const StepButton = React.memo(function StepButton({ step, color, isActive
       timerRef.current = null;
     }
     setIsPressing(false);
-    if (buttonRef.current) {
+    if (buttonRef.current && isActive) {
       onOpenSettings(trackId, stepIndex, buttonRef.current.getBoundingClientRect());
     }
   };
@@ -73,9 +73,10 @@ export const StepButton = React.memo(function StepButton({ step, color, isActive
         onPointerLeave={handlePointerLeave}
         onContextMenu={handleContextMenu}
         className={clsx(
-          "absolute top-0 left-0 h-10 sm:h-12 rounded-md transition-all duration-100 border-2 touch-none step-btn",
+          "absolute top-0 left-0 h-10 sm:h-12 rounded-md transition-all duration-100 border-2 touch-none step-btn overflow-hidden flex items-center",
           isActive ? "border-transparent" : "border-[#333]",
-          isPressing && "scale-95"
+          isPressing && "scale-95",
+          (step.offset || 0) < 0 ? "justify-start pl-1" : ((step.offset || 0) > 0 ? "justify-end pr-1" : "justify-center")
         )}
         style={{
           width: isActive && span > 1 ? `calc(${span * 100}% + ${(span - 1) * 4}px)` : '100%',
@@ -83,7 +84,11 @@ export const StepButton = React.memo(function StepButton({ step, color, isActive
           boxShadow: isActive ? `0 0 12px ${color}80` : 'none',
           opacity: isActive ? 0.8 : 1,
         }}
-      />
+      >
+        {isActive && step.offset !== 0 && (
+          <div className="w-1.5 h-1.5 bg-black/40 rounded-full" title="Micro-timing offset"></div>
+        )}
+      </button>
     </div>
   );
 });

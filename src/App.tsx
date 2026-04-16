@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as Tone from 'tone';
 import { Mp3Encoder } from '@breezystack/lamejs';
-import { Play, Square, Circle, Download, Volume2, VolumeX, Settings2, Bell, BellOff, Plus, Minus, Trash2, PlusCircle, SlidersHorizontal, Save, FolderOpen, Undo2, Redo2, Upload, BookOpen, X, Copy, ArrowLeft, ArrowRight, Eraser, CopyPlus, ChevronUp, ChevronDown, Loader2, Repeat, Timer } from 'lucide-react';
+import { Play, Square, Circle, Download, Volume2, VolumeX, Settings2, Bell, BellOff, Plus, Minus, Trash2, PlusCircle, SlidersHorizontal, Save, FolderOpen, Undo2, Redo2, Upload, BookOpen, X, Copy, ArrowLeft, ArrowRight, Eraser, CopyPlus, ChevronUp, ChevronDown, Loader2, Repeat, Timer, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { engine } from './audio';
 import { TrackData, StepData, TrackTemplate } from './types';
@@ -11,6 +11,7 @@ import { TrackRow } from './components/TrackRow';
 import { PromptModal } from './components/PromptModal';
 import { SampleTrimmerModal } from './components/SampleTrimmerModal';
 import SFXStudio from './components/SFXStudio';
+import { HelpModal } from './components/HelpModal';
 
 const createEmptySteps = (length: number, defaultNote: string) => 
   Array.from({ length }, () => ({ active: false, note: defaultNote, velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 }));
@@ -63,9 +64,32 @@ export default function App() {
   const [masterHPFFreq, setMasterHPFFreq] = useState(20);
   const [swing, setSwing] = useState(0);
   
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [performanceMode, setPerformanceMode] = useState(false);
+  const [headphoneMode, setHeadphoneMode] = useState(false);
+  const [defaultVelocity, setDefaultVelocity] = useState(0.8);
+  const [trackFollow, setTrackFollow] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState<1 | 2 | 3>(1);
+
+  // defaultVelocity reference so we can use it in toggleStep without stale closure
+  const defaultVelocityRef = useRef(defaultVelocity);
+  useEffect(() => { defaultVelocityRef.current = defaultVelocity; }, [defaultVelocity]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light');
+    document.documentElement.classList.remove('zoom-1', 'zoom-2', 'zoom-3');
+    document.documentElement.classList.add(`zoom-${zoomLevel}`);
+  }, [theme, zoomLevel]);
+
+  useEffect(() => {
+    engine.setHeadphoneMode(headphoneMode);
+  }, [headphoneMode]);
+
   const [past, setPast] = useState<TrackData[][]>([]);
   const [future, setFuture] = useState<TrackData[][]>([]);
   const [showProGuide, setShowProGuide] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [trimmerModal, setTrimmerModal] = useState<{
     isOpen: boolean;
     file: File;
@@ -78,7 +102,7 @@ export default function App() {
     title: string;
     message: string;
     defaultValue: string;
-    inputType?: 'text' | 'number' | 'select';
+    inputType?: 'text' | 'number' | 'select' | 'none';
     options?: { label: string; value: string }[];
     onConfirm: (value: string) => void;
     onCancel: () => void;
@@ -147,6 +171,9 @@ export default function App() {
   const recordingRef = useRef(recording);
   useEffect(() => { recordingRef.current = recording; }, [recording]);
 
+  const performanceModeRef = useRef(performanceMode);
+  useEffect(() => { performanceModeRef.current = performanceMode; }, [performanceMode]);
+
   useEffect(() => {
     engine.setMasterFX(delayWet, delayTime, reverbWet, distWet, masterChorusWet, masterBitcrusherWet, masterVolume, masterEqLow, masterEqMid, masterEqHigh, masterFilterFreq, masterHPFFreq);
     engine.setMasterCompressor(masterCompThreshold, masterCompRatio);
@@ -183,6 +210,9 @@ export default function App() {
     }));
   }, [bars]);
 
+  const trackFollowRef = useRef(trackFollow);
+  useEffect(() => { trackFollowRef.current = trackFollow; }, [trackFollow]);
+
   useEffect(() => {
     if (!started) return;
 
@@ -216,16 +246,30 @@ export default function App() {
         }
       });
       
-      Tone.Draw.schedule(() => {
-        const currentEls = document.getElementsByClassName('is-current');
-        while(currentEls.length > 0) {
-          currentEls[0].classList.remove('is-current');
-        }
-        const nextEls = document.getElementsByClassName(`step-container-${currentStepIndex}`);
-        for (let i = 0; i < nextEls.length; i++) {
-          nextEls[i].classList.add('is-current');
-        }
-      }, time);
+      if (!performanceModeRef.current) {
+        Tone.Draw.schedule(() => {
+          const currentEls = document.getElementsByClassName('is-current');
+          while(currentEls.length > 0) {
+            currentEls[0].classList.remove('is-current');
+          }
+          const nextEls = document.getElementsByClassName(`step-container-${currentStepIndex}`);
+          for (let i = 0; i < nextEls.length; i++) {
+            nextEls[i].classList.add('is-current');
+            // Auto scroll container wrapper if trackFollow is enabled
+            if (i === 0 && trackFollowRef.current) {
+              const el = nextEls[i] as HTMLElement;
+              const container = el.closest('.custom-scrollbar');
+              if (container) {
+                // Scroll container to center the element smoothly
+                const containerRect = container.getBoundingClientRect();
+                const elRect = el.getBoundingClientRect();
+                const scrollLeft = el.offsetLeft - containerRect.width / 2 + elRect.width / 2;
+                container.scrollTo({ left: scrollLeft, behavior: 'auto' });
+              }
+            }
+          }
+        }, time);
+      }
       
       if (currentStepIndex === currentTotalSteps - 1) {
         if (!loopPlaybackRef.current) {
@@ -407,7 +451,7 @@ export default function App() {
       const newTracks = prevTracks.map((track) => {
         if (track.id === trackId) {
           const newSteps = [...track.steps];
-          const defaultStep = { active: false, note: track.defaultNote || 'C4', velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 };
+          const defaultStep = { active: false, note: track.defaultNote || 'C4', velocity: defaultVelocityRef.current, duration: '16n', offset: 0, stepSpan: 1 };
           const step = { ...(newSteps[stepIndex] || defaultStep) };
           step.active = !step.active;
           newSteps[stepIndex] = step;
@@ -852,6 +896,9 @@ export default function App() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
+      // Stop playback before loading new data to prevent glitches
+      Tone.Transport.stop();
+      setPlaying(false);
       try {
         const project = JSON.parse(event.target?.result as string);
         if (project.bpm) setBpm(project.bpm);
@@ -1031,6 +1078,13 @@ export default function App() {
                 <span className="text-xs font-bold hidden sm:inline">BACK</span>
               </button>
               <h1 className="text-xl font-bold tracking-tighter text-[#FF4444]">MIDI STUDIO</h1>
+              <button 
+                onClick={() => setShowHelpModal(true)}
+                className="p-1.5 bg-[#333] hover:bg-[#444] rounded-full text-[#8E9299] hover:text-white transition-colors"
+                title="Help Center"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </button>
               <div className="h-6 w-px bg-[#333] hidden sm:block"></div>
               
               {/* Transport */}
@@ -1123,6 +1177,30 @@ export default function App() {
                   <CopyPlus className="w-3.5 h-3.5" />
                 </button>
               </div>
+
+              <div className="h-6 w-px bg-[#333] hidden sm:block"></div>
+
+              {/* View options */}
+              <div className="flex items-center gap-2 bg-[#1a1a1a] p-1 rounded-lg border border-[#333]">
+                <button
+                  onClick={() => setTrackFollow(!trackFollow)}
+                  className={`p-2 rounded text-xs font-bold transition-colors ${trackFollow ? 'bg-[#00AAFF]/20 text-[#00AAFF]' : 'text-[#8E9299] hover:text-white'}`}
+                  title="Auto-scroll to follow playback"
+                >
+                  TRACK FOLLOW
+                </button>
+                <div className="w-px h-6 bg-[#333]"></div>
+                <select 
+                  value={zoomLevel} 
+                  onChange={e => setZoomLevel(parseInt(e.target.value) as 1 | 2 | 3)} 
+                  className="bg-transparent text-[#8E9299] hover:text-white text-xs px-2 py-1 outline-none font-bold"
+                  title="UI Size / Zoom Mode"
+                >
+                  <option value={1} className="bg-[#1a1a1a]">SIZE 1</option>
+                  <option value={2} className="bg-[#1a1a1a]">SIZE 2</option>
+                  <option value={3} className="bg-[#1a1a1a]">SIZE 3</option>
+                </select>
+              </div>
             </div>
 
             <div className="flex items-center gap-4 flex-wrap">
@@ -1135,8 +1213,19 @@ export default function App() {
                   <Redo2 className="w-4 h-4" />
                 </button>
                 <button onClick={() => {
-                  commitHistory();
-                  setTracks(tracks.map(t => ({ ...t, steps: t.steps.map(s => ({ ...s, active: false })) })));
+                  setPromptModal({
+                    isOpen: true,
+                    title: 'CLEAR PROJECT',
+                    message: 'Are you sure you want to delete all data and reset the tracks?',
+                    defaultValue: '',
+                    inputType: 'none',
+                    onConfirm: () => {
+                      commitHistory();
+                      setTracks(tracks.map(t => ({ ...t, steps: t.steps.map(s => ({ ...s, active: false })) })));
+                      setPromptModal(null);
+                    },
+                    onCancel: () => setPromptModal(null)
+                  });
                 }} className="p-2 text-[#8E9299] hover:text-[#FF4444] bg-[#1a1a1a] rounded-lg border border-[#333] transition-colors" title="Clear All Tracks">
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -1158,6 +1247,10 @@ export default function App() {
                 <button onClick={() => setShowProGuide(true)} className="p-2 text-[#8E9299] hover:text-[#00AAFF] bg-[#1a1a1a] rounded-lg border border-[#333] flex items-center gap-2 transition-colors" title="Pro Guide">
                   <BookOpen className="w-4 h-4" />
                   <span className="text-xs font-bold hidden lg:inline">GUIDE</span>
+                </button>
+                <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-[#8E9299] hover:text-[#00AAFF] bg-[#1a1a1a] rounded-lg border border-[#333] flex items-center gap-2 transition-colors" title="Settings">
+                  <Settings2 className="w-4 h-4" />
+                  <span className="text-xs font-bold hidden lg:inline">SETTING</span>
                 </button>
               </div>
 
@@ -1435,6 +1528,92 @@ export default function App() {
         />
       )}
 
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-[#151619] border border-[#333] rounded-xl p-6 max-w-md w-full shadow-2xl relative"
+          >
+            <button onClick={() => setIsSettingsOpen(false)} className="absolute top-4 right-4 text-[#8E9299] hover:text-white transition-colors">
+              <X size={20} />
+            </button>
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <Settings2 className="text-[#00AAFF]" />
+              APP SETTINGS
+            </h2>
+            
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-bold text-[#8E9299] mb-3 border-b border-[#333] pb-2">APPEARANCE</h3>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold">Light Mode</div>
+                    <div className="text-xs text-[#8E9299]">Switch app theme to light</div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={theme === 'light'} onChange={e => setTheme(e.target.checked ? 'light' : 'dark')} />
+                    <div className="w-11 h-6 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00AAFF]"></div>
+                  </label>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-bold text-[#8E9299] mb-3 border-b border-[#333] pb-2">AUDIO</h3>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold">Headphone Mode</div>
+                      <div className="text-xs text-[#8E9299]">Enhance spatial audio for headphones</div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={headphoneMode} onChange={e => setHeadphoneMode(e.target.checked)} />
+                      <div className="w-11 h-6 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#44FF44]"></div>
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold">Default Note Velocity</div>
+                      <div className="text-xs text-[#8E9299]">Starting velocity for new blocks</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[#8E9299] font-bold">{Math.round(defaultVelocity * 100)}%</span>
+                      <input 
+                        type="range" min="0.1" max="1" step="0.05" value={defaultVelocity}
+                        onChange={e => setDefaultVelocity(parseFloat(e.target.value))}
+                        className="w-24 custom-slider slider-blue"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-bold text-[#8E9299] mb-3 border-b border-[#333] pb-2">PERFORMANCE</h3>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold">Performance Mode</div>
+                    <div className="text-xs text-[#8E9299]">Disables visual animations to save CPU CPU</div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={performanceMode} onChange={e => setPerformanceMode(e.target.checked)} />
+                    <div className="w-11 h-6 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FF4444]"></div>
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-8 pt-4 border-t border-[#333] flex justify-end">
+              <button onClick={() => setIsSettingsOpen(false)} className="px-6 py-2 bg-[#00AAFF] hover:bg-[#0099ee] text-white font-bold rounded-lg transition-colors">
+                DONE
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Pro Guide Modal */}
       {showProGuide && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -1521,7 +1700,9 @@ export default function App() {
           onCancel={() => setTrimmerModal(null)}
         />
       )}
-
+      {showHelpModal && (
+        <HelpModal onClose={() => setShowHelpModal(false)} />
+      )}
     </div>
   );
 }

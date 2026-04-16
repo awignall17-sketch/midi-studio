@@ -5,7 +5,7 @@ interface PromptModalProps {
   title: string;
   message: string;
   defaultValue: string;
-  inputType?: 'text' | 'number' | 'select';
+  inputType?: 'text' | 'number' | 'select' | 'none';
   options?: { label: string; value: string }[];
   onConfirm: (value: string) => void;
   onCancel: () => void;
@@ -26,28 +26,30 @@ export function PromptModal({ isOpen, title, message, defaultValue, inputType = 
         <h2 className="text-xl font-bold text-white">{title}</h2>
         <p className="text-sm text-[#8E9299]">{message}</p>
         
-        {inputType === 'select' && options ? (
-          <select
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            className="w-full bg-[#242424] text-white p-3 rounded-lg border border-[#333] outline-none focus:border-[#FF4444] transition-colors"
-          >
-            {options.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        ) : (
-          <input
-            type={inputType}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            className="w-full bg-[#242424] text-white p-3 rounded-lg border border-[#333] outline-none focus:border-[#FF4444] transition-colors"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') onConfirm(value);
-              if (e.key === 'Escape') onCancel();
-            }}
-          />
+        {inputType !== 'none' && (
+          inputType === 'select' && options ? (
+            <select
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="w-full bg-[#242424] text-white p-3 rounded-lg border border-[#333] outline-none focus:border-[#FF4444] transition-colors"
+            >
+              {options.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type={inputType}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="w-full bg-[#242424] text-white p-3 rounded-lg border border-[#333] outline-none focus:border-[#FF4444] transition-colors"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onConfirm(value);
+                if (e.key === 'Escape') onCancel();
+              }}
+            />
+          )
         )}
 
         <div className="flex justify-end gap-3 mt-2">

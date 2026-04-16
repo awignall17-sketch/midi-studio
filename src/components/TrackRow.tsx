@@ -84,6 +84,10 @@ export const TrackRow = React.memo(function TrackRow({
             onChange={(e) => onUpdateTrack(trackIndex, { instrument: e.target.value })}
             className="bg-[#242424] text-xs font-bold text-[#8E9299] p-1 rounded border border-[#333] outline-none flex-1 min-w-0"
           >
+            <optgroup label="8-Bit & Chiptune">
+              <option value="8bit">8-Bit Square</option>
+              <option value="chiptune">Chiptune Triangle</option>
+            </optgroup>
             <optgroup label="Trap & Phonk">
               <option value="808">808 Soft</option>
               <option value="808_hard">808 Hard</option>
@@ -154,6 +158,17 @@ export const TrackRow = React.memo(function TrackRow({
               <option value="brass">Brass</option>
               <option value="flute">Flute</option>
             </optgroup>
+            <optgroup label="Pop & Rock">
+              <option value="electric_bass">Electric Bass</option>
+              <option value="acoustic_guitar">Acoustic Guitar</option>
+            </optgroup>
+            <optgroup label="Cinematic & Orchestral">
+              <option value="cinematic_brass">Cinematic Brass</option>
+              <option value="cinematic_strings">Cinematic Strings</option>
+              <option value="taiko_drum">Taiko Drum</option>
+              <option value="epic_choir">Epic Choir</option>
+              <option value="orchestral_hit">Orchestral Hit</option>
+            </optgroup>
             <optgroup label="Custom">
               <option value="sampler">Custom Sample...</option>
             </optgroup>
@@ -188,8 +203,37 @@ export const TrackRow = React.memo(function TrackRow({
             </button>
           </div>
         </div>
+
+        {track.type === 'melodic' && track.instrument !== 'sampler' && (
+          <div className="mt-1 flex items-center justify-between gap-2 border-t border-[#2a2b30] pt-1">
+            <span className="text-[0.5625rem] font-bold text-[#8E9299]">PITCH</span>
+            <div className="flex gap-1" title="Default note when you click a step">
+              <select
+                value={(track.defaultNote || 'C4').replace(/\d/, '')}
+                onChange={(e) => {
+                  const newNote = e.target.value + (track.defaultNote || 'C4').replace(/\D/g, '');
+                  onUpdateTrack(trackIndex, { defaultNote: newNote });
+                }}
+                className="bg-[#1a1a1a] text-[#8E9299] hover:text-white text-[0.625rem] p-0.5 rounded border border-[#333] focus:outline-none focus:border-[#00AAFF]"
+              >
+                {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <select
+                value={(track.defaultNote || 'C4').replace(/\D/g, '')}
+                onChange={(e) => {
+                  const newNote = (track.defaultNote || 'C4').replace(/\d/, '') + e.target.value;
+                  onUpdateTrack(trackIndex, { defaultNote: newNote });
+                }}
+                className="bg-[#1a1a1a] text-[#8E9299] hover:text-white text-[0.625rem] p-0.5 rounded border border-[#333] focus:outline-none focus:border-[#00AAFF]"
+              >
+                {[1, 2, 3, 4, 5, 6].map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
+
         {track.instrument === 'sampler' && (
-          <div className="mt-1 flex flex-col gap-1">
+          <div className="mt-1 flex flex-col gap-1 border-t border-[#2a2b30] pt-1">
             <label className="flex items-center justify-center gap-1 bg-[#1a1a1a] hover:bg-[#333] border border-[#333] rounded p-1 cursor-pointer text-[0.625rem] text-[#8E9299] hover:text-white transition-colors">
               <Upload className="w-3 h-3" />
               <span>{track.sampleUrl ? 'CHANGE SAMPLE' : 'UPLOAD SAMPLE'}</span>
@@ -212,13 +256,24 @@ export const TrackRow = React.memo(function TrackRow({
                 <div className="flex-1 flex items-center gap-1">
                   <span className="text-[0.5625rem] font-bold text-[#8E9299] w-8" title="Note placed in sequencer">NOTE</span>
                   <select
-                    value={track.defaultNote || 'C4'}
-                    onChange={(e) => onUpdateTrack(trackIndex, { defaultNote: e.target.value })}
+                    value={(track.defaultNote || 'C4').replace(/\d/, '')}
+                    onChange={(e) => {
+                      const newNote = e.target.value + (track.defaultNote || 'C4').replace(/\D/g, '');
+                      onUpdateTrack(trackIndex, { defaultNote: newNote });
+                    }}
                     className="flex-1 bg-[#1a1a1a] text-white text-[0.625rem] p-0.5 rounded border border-[#333] focus:outline-none focus:border-[#FF4444]"
                   >
-                    {['C2', 'C3', 'C4', 'C5', 'C6'].map(note => (
-                      <option key={note} value={note}>{note}</option>
-                    ))}
+                    {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                  <select
+                    value={(track.defaultNote || 'C4').replace(/\D/g, '')}
+                    onChange={(e) => {
+                      const newNote = (track.defaultNote || 'C4').replace(/\d/, '') + e.target.value;
+                      onUpdateTrack(trackIndex, { defaultNote: newNote });
+                    }}
+                    className="bg-[#1a1a1a] text-white text-[0.625rem] p-0.5 rounded border border-[#333] focus:outline-none focus:border-[#FF4444]"
+                  >
+                    {[1, 2, 3, 4, 5, 6].map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
               </div>
@@ -243,27 +298,49 @@ export const TrackRow = React.memo(function TrackRow({
               </div>
             )}
             {track.sampleUrl && (
-              <div className="flex items-center gap-2 mt-1">
-                <div className="flex-1 flex items-center gap-1">
-                  <span className="text-[0.5625rem] font-bold text-[#8E9299] w-8">DUR</span>
-                  <input
-                    type="range" min="0.1" max="10" step="0.1" value={track.sampleDuration || 1}
-                    onChange={e => onUpdateTrack(trackIndex, { sampleDuration: parseFloat(e.target.value) }, true)}
-                    onPointerDown={() => onCommitHistory()}
-                    className="custom-slider w-full" style={{ '--thumb-color': '#FF4444' } as any}
-                  />
-                  <span className="text-[0.5625rem] font-mono text-[#8E9299] w-6 text-right">{track.sampleDuration || 1}s</span>
+              <>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 flex items-center gap-1">
+                    <span className="text-[0.5625rem] font-bold text-[#8E9299] w-8">START</span>
+                    <input
+                      type="range" min="0" max="60" step="0.1" value={track.sampleStart || 0}
+                      onChange={e => onUpdateTrack(trackIndex, { sampleStart: parseFloat(e.target.value) }, true)}
+                      className="custom-slider w-full" style={{ '--thumb-color': '#FF4444' } as any}
+                    />
+                    <span className="text-[0.5625rem] font-mono text-[#8E9299] w-6 text-right">{track.sampleStart || 0}s</span>
+                  </div>
+                  <div className="flex-1 flex items-center gap-1">
+                    <span className="text-[0.5625rem] font-bold text-[#8E9299] w-8">END</span>
+                    <input
+                      type="range" min="0" max="60" step="0.1" value={track.sampleEnd || 0}
+                      onChange={e => onUpdateTrack(trackIndex, { sampleEnd: parseFloat(e.target.value) }, true)}
+                      className="custom-slider w-full" style={{ '--thumb-color': '#FF4444' } as any}
+                    />
+                    <span className="text-[0.5625rem] font-mono text-[#8E9299] w-8 text-right">{track.sampleEnd === 0 ? 'MAX' : `${track.sampleEnd}s`}</span>
+                  </div>
                 </div>
-                <label className="flex items-center gap-1 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={track.sampleFade ?? true}
-                    onChange={e => onUpdateTrack(trackIndex, { sampleFade: e.target.checked })}
-                    className="w-3 h-3 accent-[#FF4444]"
-                  />
-                  <span className="text-[0.5625rem] font-bold text-[#8E9299]">FADE</span>
-                </label>
-              </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 flex items-center gap-1">
+                    <span className="text-[0.5625rem] font-bold text-[#8E9299] w-8">DUR</span>
+                    <input
+                      type="range" min="0.1" max="10" step="0.1" value={track.sampleDuration || 1}
+                      onChange={e => onUpdateTrack(trackIndex, { sampleDuration: parseFloat(e.target.value) }, true)}
+                      onPointerDown={() => onCommitHistory()}
+                      className="custom-slider w-full" style={{ '--thumb-color': '#FF4444' } as any}
+                    />
+                    <span className="text-[0.5625rem] font-mono text-[#8E9299] w-6 text-right">{track.sampleDuration || 1}s</span>
+                  </div>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={track.sampleFade ?? true}
+                      onChange={e => onUpdateTrack(trackIndex, { sampleFade: e.target.checked })}
+                      className="w-3 h-3 accent-[#FF4444]"
+                    />
+                    <span className="text-[0.5625rem] font-bold text-[#8E9299]">FADE</span>
+                  </label>
+                </div>
+              </>
             )}
           </div>
         )}
