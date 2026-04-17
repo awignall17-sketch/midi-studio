@@ -4,7 +4,7 @@ import * as Tone from 'tone';
 
 interface Props {
   file: File;
-  onConfirm: (start: number, end: number, duration: number) => void;
+  onConfirm: (start: number, end: number, duration: number, b64Data: string) => void;
   onCancel: () => void;
 }
 
@@ -13,10 +13,19 @@ export function SampleTrimmerModal({ file, onConfirm, onCancel }: Props) {
   const [start, setStart] = useState<number>(0);
   const [end, setEnd] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [base64Data, setBase64Data] = useState<string>('');
   const playerRef = useRef<Tone.Player | null>(null);
   const urlRef = useRef<string>('');
 
   useEffect(() => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result && typeof e.target.result === 'string') {
+        setBase64Data(e.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+
     const url = URL.createObjectURL(file);
     urlRef.current = url;
     
@@ -139,8 +148,8 @@ export function SampleTrimmerModal({ file, onConfirm, onCancel }: Props) {
             CANCEL
           </button>
           <button
-            onClick={() => onConfirm(start, end, duration)}
-            disabled={duration === 0}
+            onClick={() => onConfirm(start, end, duration, base64Data)}
+            disabled={duration === 0 || !base64Data}
             className="flex-1 py-2 bg-[#00AAFF] hover:bg-[#33bbff] text-white rounded-lg font-bold transition-colors disabled:opacity-50"
           >
             CONFIRM

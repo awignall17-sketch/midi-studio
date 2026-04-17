@@ -49,6 +49,7 @@ export interface TrackData {
   chorusWet: number;
   bitcrusherWet: number;
   swing: number;
+  minimized?: boolean;
   stepsCount?: number;
   sampleUrl?: string;
   sampleRootNote?: string;
@@ -58,4 +59,10 @@ export interface TrackData {
   sampleStart?: number;
   sampleEnd?: number;
   sampleFade?: boolean;
+  envelope?: { attack: number; decay: number; sustain: number; release: number };
+  filterCutoff?: number;
+  filterResonance?: number;
+  drive?: number;
+  lfoRate?: number;
+  ampMod?: number;
 }

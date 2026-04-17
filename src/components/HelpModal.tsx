@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, X, Music, SlidersHorizontal, MousePointerClick, AudioWaveform, Clock } from 'lucide-react';
+import { Search, X, Music, SlidersHorizontal, MousePointerClick, AudioWaveform, Clock, Headphones } from 'lucide-react';
 
 interface Props {
   onClose: () => void;
@@ -7,6 +7,13 @@ interface Props {
 
 export function HelpModal({ onClose }: Props) {
   const [searchWord, setSearchWord] = useState('');
+  const [expandedTopics, setExpandedTopics] = useState<number[]>([]);
+
+  const toggleTopic = (index: number) => {
+    setExpandedTopics(prev => 
+      prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
+    );
+  };
 
   const helpTopics = [
     {
@@ -22,6 +29,12 @@ export function HelpModal({ onClose }: Props) {
       content: `• First, add a beat so it is active (colored).\n• LONG-CLICK (hold it down) or RIGHT-CLICK the active beat to open the Advanced Step Settings menu.\n• Velocity: Adjust how hard the note is hit.\n• Pitch (Melodic Tracks): Shift the exact key of that specific note.\n• Duration: Dictates how long the synth plays (Stretch).\n• Step Span (Hold): Visually drag the note over multiple grid squares.\n• Offset: Micro-timing. Shift the beat slightly early or late. An offset visual dot will appear on the beat!`
     },
     {
+      title: 'Enhanced Headphone Mode',
+      icon: <Headphones className="w-5 h-5 text-[#22cc22]" />,
+      tags: ['headphone', 'binaural', 'pan', 'spatial', '3d'],
+      content: `• Toggle "HEADPHONES" in the Settings menu to activate Spatial Audio Mode.\n• When enabled, the pan knobs on your tracks utilize Binaural 3D panning instead of standard stereo panning.\n• This simulates sound moving around your head in a 3D acoustic space, perfect for creating immersive soundscapes or detailed headphone mixes.`
+    },
+    {
       title: 'Using the Sampler',
       icon: <AudioWaveform className="w-5 h-5 text-[#AA00FF]" />,
       tags: ['sampler', 'upload', 'audio', 'wav', 'mp3', 'clip', 'trim', 'speed', 'root'],
@@ -29,7 +42,7 @@ export function HelpModal({ onClose }: Props) {
     },
     {
       title: 'Master Effects (FX)',
-      icon: <SlidersHorizontal className="w-5 h-5 text-[#22cc22]" />,
+      icon: <SlidersHorizontal className="w-5 h-5 text-[#FF44FF]" />,
       tags: ['reverb', 'delay', 'echo', 'compression', 'eq', 'filter', 'master'],
       content: `• The bottom strip contains global Master Effects affecting your whole song.\n• COMP THR & RATIO: This controls compression. It makes quiet sounds louder and loud sounds smoother.\n• ECHO (Delay) & VERB (Reverb): Adds 3D space and bounce to your overall track.\n• EQ (Low, Mid, High): Boost the lows for more bass, or cut highs to reduce harshness.`
     },
@@ -72,21 +85,33 @@ export function HelpModal({ onClose }: Props) {
           </div>
         </div>
         
-        <div className="overflow-y-auto p-6 space-y-6 flex-1 custom-scrollbar">
+        <div className="overflow-y-auto p-6 space-y-4 flex-1 custom-scrollbar">
           {filteredTopics.length === 0 ? (
             <div className="text-center text-[#8E9299] py-10">
               No results found for "{searchWord}"
             </div>
           ) : (
             filteredTopics.map((topic, i) => (
-              <div key={i} className="bg-[#1a1b20] border border-[#333] rounded-xl p-5 hover:border-[#444] transition-colors">
-                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-3">
-                  <div className="bg-[#242424] p-2 rounded-lg border border-[#333]">{topic.icon}</div>
-                  {topic.title}
-                </h3>
-                <div className="text-sm text-[#8E9299] leading-relaxed whitespace-pre-line ml-[52px]">
-                  {topic.content}
+              <div 
+                key={i} 
+                onClick={() => toggleTopic(i)}
+                className={`bg-[#1a1b20] border border-[#333] rounded-xl hover:border-[#444] transition-colors cursor-pointer overflow-hidden ${expandedTopics.includes(i) ? 'scale-[1.02] shadow-lg ring-1 ring-[#00AAFF]/50' : ''}`}
+                style={{ transition: 'all 0.2s ease-in-out' }}
+              >
+                <div className="p-5 flex justify-between items-center bg-[#1a1b20] z-10 relative">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-3">
+                    <div className="bg-[#242424] p-2 rounded-lg border border-[#333]">{topic.icon}</div>
+                    {topic.title}
+                  </h3>
+                  <div className="text-[#8E9299]">
+                    {expandedTopics.includes(i) ? <X size={20} /> : <div className="text-sm font-bold border border-[#333] px-2 py-0.5 rounded">READ MORE</div>}
+                  </div>
                 </div>
+                {expandedTopics.includes(i) && (
+                  <div className="text-sm text-[#8E9299] leading-relaxed whitespace-pre-line px-5 pb-5 ml-[52px] animate-in fade-in slide-in-from-top-4 duration-200 border-t border-[#333] pt-4 mt-2">
+                    {topic.content}
+                  </div>
+                )}
               </div>
             ))
           )}

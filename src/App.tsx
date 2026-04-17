@@ -10,11 +10,37 @@ import { StepSettings } from './components/StepSettings';
 import { TrackRow } from './components/TrackRow';
 import { PromptModal } from './components/PromptModal';
 import { SampleTrimmerModal } from './components/SampleTrimmerModal';
+import { AdvancedTrackModal } from './components/AdvancedTrackModal';
 import SFXStudio from './components/SFXStudio';
 import { HelpModal } from './components/HelpModal';
 
 const createEmptySteps = (length: number, defaultNote: string) => 
   Array.from({ length }, () => ({ active: false, note: defaultNote, velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 }));
+
+const PlaybackTracker = () => {
+  const [time, setTime] = useState(0);
+  useEffect(() => {
+    let animationFrame: number;
+    const updateTime = () => {
+      setTime(Tone.Transport.seconds);
+      animationFrame = requestAnimationFrame(updateTime);
+    };
+    animationFrame = requestAnimationFrame(updateTime);
+    return () => cancelAnimationFrame(animationFrame);
+  }, []);
+
+  const d = new Date(time * 1000);
+  const m = d.getUTCMinutes().toString().padStart(2, '0');
+  const s = d.getUTCSeconds().toString().padStart(2, '0');
+  const ms = Math.floor(d.getUTCMilliseconds() / 10).toString().padStart(2, '0');
+  
+  return (
+    <div className="flex flex-col items-center justify-center bg-[#1a1a1a] p-2 rounded-lg border border-[#333] min-w-24">
+      <div className="text-[0.625rem] text-[#8E9299] font-bold">TIME</div>
+      <div className="text-sm font-mono text-[#00AAFF] font-bold mt-0.5">{m}:{s}.{ms}</div>
+    </div>
+  );
+};
 
 const INITIAL_TRACKS: TrackData[] = [
   { id: '1', name: 'KICK', type: 'drum', instrument: 'kick', color: '#FF4444', volume: 0, pan: 0, muted: false, solo: false, defaultNote: 'C1', delayWet: 0, reverbWet: 0, distWet: 0, chorusWet: 0, bitcrusherWet: 0, swing: 0, steps: createEmptySteps(16, 'C1') },
@@ -70,7 +96,7 @@ export default function App() {
   const [headphoneMode, setHeadphoneMode] = useState(false);
   const [defaultVelocity, setDefaultVelocity] = useState(0.8);
   const [trackFollow, setTrackFollow] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState<1 | 2 | 3>(1);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
 
   // defaultVelocity reference so we can use it in toggleStep without stale closure
   const defaultVelocityRef = useRef(defaultVelocity);
@@ -78,8 +104,8 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light');
-    document.documentElement.classList.remove('zoom-1', 'zoom-2', 'zoom-3');
-    document.documentElement.classList.add(`zoom-${zoomLevel}`);
+    document.documentElement.classList.remove('zoom-1', 'zoom-2', 'zoom-2-5', 'zoom-3');
+    document.documentElement.classList.add(`zoom-${zoomLevel === 2.5 ? '2-5' : zoomLevel}`);
   }, [theme, zoomLevel]);
 
   useEffect(() => {
@@ -90,6 +116,7 @@ export default function App() {
   const [future, setFuture] = useState<TrackData[][]>([]);
   const [showProGuide, setShowProGuide] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [advancedSettingsModal, setAdvancedSettingsModal] = useState<number | null>(null);
   const [trimmerModal, setTrimmerModal] = useState<{
     isOpen: boolean;
     file: File;
@@ -188,7 +215,7 @@ export default function App() {
     const hasSolo = tracks.some(t => t.solo);
     tracks.forEach(track => {
       const isMuted = hasSolo ? !track.solo : track.muted;
-      engine.syncTrack(track.id, track.instrument, track.volume, track.pan, isMuted, track.delayWet, track.reverbWet, track.distWet, track.chorusWet, track.bitcrusherWet, track.sampleUrl, track.sampleRootNote, track.samplePlaybackSpeed, track.sampleReverse, track.sampleDuration, track.sampleFade ?? true, track.sampleStart ?? 0, track.sampleEnd ?? 0);
+      engine.syncTrack(track.id, track.instrument, track.volume, track.pan, isMuted, track.delayWet, track.reverbWet, track.distWet, track.chorusWet, track.bitcrusherWet, track.sampleUrl, track.sampleRootNote, track.samplePlaybackSpeed, track.sampleReverse, track.sampleDuration, track.sampleFade ?? true, track.sampleStart ?? 0, track.sampleEnd ?? 0, track.envelope, track.filterCutoff ?? 20000, track.filterResonance ?? 0, track.drive ?? 0, track.lfoRate ?? 0, track.ampMod ?? 0);
     });
   }, [tracks, started]);
 
@@ -926,14 +953,15 @@ export default function App() {
               for (let i = track.steps.length; i < targetLength; i++) {
                 newSteps[i] = { active: false, note: track.defaultNote || 'C4', velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 };
               }
-              return { ...track, steps: newSteps };
+              return { ...track, steps: newSteps, stepsCount: targetLength };
             }
             return track;
           });
           setTracks(paddedTracks);
         }
-      } catch (err) {
-        console.error('Invalid project file');
+      } catch (err: any) {
+        console.error('Invalid project file:', err);
+        alert('Failed to load project file. It may be corrupted or too large. Error: ' + err.message);
       }
     };
     reader.readAsText(file);
@@ -973,15 +1001,19 @@ export default function App() {
     e.target.value = '';
   };
 
-  const confirmSampleTrim = (start: number, end: number, duration: number) => {
+  const confirmSampleTrim = (start: number, end: number, duration: number, b64Data: string) => {
     if (!trimmerModal) return;
     
-    const url = URL.createObjectURL(trimmerModal.file);
+    // Check if b64Data is too massive to store comfortably in JSON memory
+    if (b64Data.length > 5_000_000) {
+      alert("WARNING: This audio file is very large. Saving your project might cause lag or failure. Consider using shorter files!");
+    }
+
     const name = trimmerModal.file.name.split('.')[0].substring(0, 10).toUpperCase();
     
     if (trimmerModal.trackIndex !== null) {
       updateTrack(trimmerModal.trackIndex, { 
-        sampleUrl: url, 
+        sampleUrl: b64Data, 
         name,
         sampleStart: start,
         sampleEnd: end,
@@ -1006,7 +1038,7 @@ export default function App() {
         bitcrusherWet: 0,
         swing: 0,
         defaultNote: 'C4',
-        sampleUrl: url,
+        sampleUrl: b64Data,
         sampleStart: start,
         sampleEnd: end,
         sampleDuration: end - start,
@@ -1192,12 +1224,13 @@ export default function App() {
                 <div className="w-px h-6 bg-[#333]"></div>
                 <select 
                   value={zoomLevel} 
-                  onChange={e => setZoomLevel(parseInt(e.target.value) as 1 | 2 | 3)} 
+                  onChange={e => setZoomLevel(parseFloat(e.target.value))} 
                   className="bg-transparent text-[#8E9299] hover:text-white text-xs px-2 py-1 outline-none font-bold"
                   title="UI Size / Zoom Mode"
                 >
                   <option value={1} className="bg-[#1a1a1a]">SIZE 1</option>
                   <option value={2} className="bg-[#1a1a1a]">SIZE 2</option>
+                  <option value={2.5} className="bg-[#1a1a1a]">SIZE 2.5</option>
                   <option value={3} className="bg-[#1a1a1a]">SIZE 3</option>
                 </select>
               </div>
@@ -1489,6 +1522,7 @@ export default function App() {
                       onCommitHistory={commitHistory}
                       onToggleStep={toggleStep}
                       onOpenSettings={handleOpenSettings}
+                      onOpenAdvanced={(idx) => setAdvancedSettingsModal(idx)}
                     />
                   </motion.div>
                 ))}
@@ -1702,6 +1736,14 @@ export default function App() {
       )}
       {showHelpModal && (
         <HelpModal onClose={() => setShowHelpModal(false)} />
+      )}
+      {advancedSettingsModal !== null && (
+        <AdvancedTrackModal 
+          track={tracks[advancedSettingsModal]} 
+          onUpdateTrack={(data) => updateTrack(advancedSettingsModal, data)}
+          onSampleUpload={(e) => handleSampleUpload(advancedSettingsModal, e)}
+          onClose={() => setAdvancedSettingsModal(null)} 
+        />
       )}
     </div>
   );

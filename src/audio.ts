@@ -14,7 +14,7 @@ class AudioEngine {
   bitcrusher: Tone.BitCrusher | null = null;
   metronome: Tone.MembraneSynth | null = null;
   
-  trackFX: Record<string, { dist: Tone.Distortion, delay: Tone.FeedbackDelay, reverb: Tone.Reverb, chorus: Tone.Chorus, bitcrusher: Tone.BitCrusher, channel: Tone.Channel }> = {};
+  trackFX: Record<string, { dist: Tone.Distortion, delay: Tone.FeedbackDelay, reverb: Tone.Reverb, chorus: Tone.Chorus, bitcrusher: Tone.BitCrusher, filter: Tone.Filter, tremolo: Tone.Tremolo, channel: Tone.Channel }> = {};
   trackInstruments: Record<string, any> = {};
   
   recorder: MediaRecorder | null = null;
@@ -217,10 +217,12 @@ class AudioEngine {
     }
   }
 
-  syncTrack(trackId: string, instrumentType: string, volume: number, pan: number, muted: boolean, delayWet: number = 0, reverbWet: number = 0, distWet: number = 0, chorusWet: number = 0, bitcrusherWet: number = 0, sampleUrl?: string, sampleRootNote: string = 'C4', samplePlaybackSpeed: number = 1, sampleReverse: boolean = false, sampleDuration: number = 1, sampleFade: boolean = true, sampleStart: number = 0, sampleEnd: number = 0) {
+  syncTrack(trackId: string, instrumentType: string, volume: number, pan: number, muted: boolean, delayWet: number = 0, reverbWet: number = 0, distWet: number = 0, chorusWet: number = 0, bitcrusherWet: number = 0, sampleUrl?: string, sampleRootNote: string = 'C4', samplePlaybackSpeed: number = 1, sampleReverse: boolean = false, sampleDuration: number = 1, sampleFade: boolean = true, sampleStart: number = 0, sampleEnd: number = 0, envelope?: { attack: number, decay: number, sustain: number, release: number }, filterCutoff: number = 20000, filterResonance: number = 0, drive: number = 0.5, lfoRate: number = 0, ampMod: number = 0) {
     if (!this.initialized) return;
 
     if (!this.trackFX[trackId]) {
+      const filter = new Tone.Filter(20000, "lowpass");
+      const tremolo = new Tone.Tremolo(0, 0).start();
       const dist = new Tone.Distortion(0.5);
       const delay = new Tone.FeedbackDelay("8n", 0.3);
       const reverb = new Tone.Reverb(2.5);
@@ -228,13 +230,15 @@ class AudioEngine {
       const bitcrusher = new Tone.BitCrusher(8);
       const channel = new Tone.Channel().connect(this.bitcrusher!);
       
+      filter.connect(tremolo);
+      tremolo.connect(bitcrusher);
       bitcrusher.connect(chorus);
       chorus.connect(dist);
       dist.connect(delay);
       delay.connect(reverb);
       reverb.connect(channel);
 
-      this.trackFX[trackId] = { dist, delay, reverb, chorus, bitcrusher, channel };
+      this.trackFX[trackId] = { dist, delay, reverb, chorus, bitcrusher, filter, tremolo, channel };
     }
     
     const fx = this.trackFX[trackId];
@@ -246,6 +250,13 @@ class AudioEngine {
     fx.dist.wet.value = distWet;
     fx.chorus.wet.value = chorusWet;
     fx.bitcrusher.wet.value = bitcrusherWet;
+    
+    // Automation params
+    fx.filter.frequency.value = filterCutoff;
+    fx.filter.Q.value = filterResonance;
+    fx.dist.distortion = drive;
+    fx.tremolo.frequency.value = lfoRate;
+    fx.tremolo.depth.value = ampMod;
 
     if (!this.trackInstruments[trackId] || (this.trackInstruments[trackId] as any)._type !== instrumentType || (this.trackInstruments[trackId] as any)._sampleUrl !== sampleUrl || (this.trackInstruments[trackId] as any)._sampleRootNote !== sampleRootNote || (this.trackInstruments[trackId] as any)._samplePlaybackSpeed !== samplePlaybackSpeed || (this.trackInstruments[trackId] as any)._sampleReverse !== sampleReverse || (this.trackInstruments[trackId] as any)._sampleDuration !== sampleDuration || (this.trackInstruments[trackId] as any)._sampleFade !== sampleFade || (this.trackInstruments[trackId] as any)._sampleStart !== sampleStart || (this.trackInstruments[trackId] as any)._sampleEnd !== sampleEnd) {
       if (this.trackInstruments[trackId]) {
@@ -261,8 +272,16 @@ class AudioEngine {
       (inst as any)._sampleFade = sampleFade;
       (inst as any)._sampleStart = sampleStart;
       (inst as any)._sampleEnd = sampleEnd;
-      inst.connect(fx.bitcrusher);
+      inst.connect(fx.filter);
       this.trackInstruments[trackId] = inst;
+    }
+
+    if (envelope && this.trackInstruments[trackId] && typeof this.trackInstruments[trackId].set === 'function') {
+      try {
+        this.trackInstruments[trackId].set({ envelope });
+      } catch (e) {
+        // Instrument might not support classic ADSR envelope
+      }
     }
   }
 

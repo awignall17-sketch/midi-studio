@@ -73,10 +73,9 @@ export const StepButton = React.memo(function StepButton({ step, color, isActive
         onPointerLeave={handlePointerLeave}
         onContextMenu={handleContextMenu}
         className={clsx(
-          "absolute top-0 left-0 h-10 sm:h-12 rounded-md transition-all duration-100 border-2 touch-none step-btn overflow-hidden flex items-center",
+          "absolute top-0 left-0 h-10 sm:h-12 rounded-md transition-all duration-100 border-2 touch-none step-btn overflow-hidden flex items-center justify-center",
           isActive ? "border-transparent" : "border-[#333]",
-          isPressing && "scale-95",
-          (step.offset || 0) < 0 ? "justify-start pl-1" : ((step.offset || 0) > 0 ? "justify-end pr-1" : "justify-center")
+          isPressing && "scale-95"
         )}
         style={{
           width: isActive && span > 1 ? `calc(${span * 100}% + ${(span - 1) * 4}px)` : '100%',
@@ -86,7 +85,11 @@ export const StepButton = React.memo(function StepButton({ step, color, isActive
         }}
       >
         {isActive && step.offset !== 0 && (
-          <div className="w-1.5 h-1.5 bg-black/40 rounded-full" title="Micro-timing offset"></div>
+          <div 
+            className="w-1.5 h-1.5 bg-black/40 rounded-full absolute" 
+            title="Micro-timing offset"
+            style={{ left: `calc(50% + ${(step.offset || 0) * 80}%)`, transform: 'translateX(-50%)' }}
+          ></div>
         )}
       </button>
     </div>

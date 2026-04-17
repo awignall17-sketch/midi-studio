@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, ChevronUp, ChevronDown, Trash2, Copy, Eraser, ArrowRight, ArrowLeft, Upload, Shuffle, Wand2, Save } from 'lucide-react';
+import { Volume2, VolumeX, ChevronUp, ChevronDown, Trash2, Copy, Eraser, ArrowRight, ArrowLeft, Upload, Shuffle, Wand2, Save, Minimize2, Maximize2, Sliders } from 'lucide-react';
 import { TrackData } from '../types';
 import { StepButton } from './StepButton';
 
@@ -24,6 +24,7 @@ interface Props {
   onCommitHistory: () => void;
   onToggleStep: (trackId: string, stepIndex: number) => void;
   onOpenSettings: (trackId: string, stepIndex: number, rect: DOMRect) => void;
+  onOpenAdvanced: (trackIndex: number) => void;
 }
 
 export const TrackRow = React.memo(function TrackRow({
@@ -47,11 +48,12 @@ export const TrackRow = React.memo(function TrackRow({
   onCommitHistory,
   onToggleStep,
   onOpenSettings,
+  onOpenAdvanced,
 }: Props) {
   return (
-    <div className="flex border-b border-[#2a2b30] last:border-0 relative">
+    <div className={`flex border-b border-[#2a2b30] last:border-0 relative ${track.minimized ? 'h-10 sm:h-12' : ''}`}>
       {/* Track Controls (Sticky) */}
-      <div className="w-72 sm:w-80 flex-shrink-0 sticky left-0 z-10 bg-[#151619] p-2 sm:p-3 border-r border-[#2a2b30] flex flex-col gap-1.5 shadow-[4px_0_10px_rgba(0,0,0,0.3)]">
+      <div className={`w-72 sm:w-80 flex-shrink-0 sticky left-0 z-10 bg-[#151619] p-2 sm:p-3 border-r border-[#2a2b30] flex flex-col gap-1.5 shadow-[4px_0_10px_rgba(0,0,0,0.3)] transition-all overflow-hidden ${track.minimized ? 'items-center flex-row justify-between' : ''}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <input 
@@ -65,11 +67,14 @@ export const TrackRow = React.memo(function TrackRow({
               type="text" 
               value={track.name}
               onChange={(e) => onUpdateTrack(trackIndex, { name: e.target.value })}
-              className="bg-transparent text-sm font-bold outline-none w-20"
+              className="bg-transparent text-sm font-bold outline-none w-16"
               style={{ color: track.color }}
             />
           </div>
           <div className="flex gap-0.5">
+            <button onClick={() => onUpdateTrack(trackIndex, { minimized: !track.minimized })} className="p-1 rounded text-[#8E9299] hover:text-white transition-colors" title="Minimize/Maximize Track">
+              {track.minimized ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
+            </button>
             <button onClick={() => onToggleMute(trackIndex)} className={`p-1 rounded ${track.muted ? 'text-[#FF4444]' : 'text-[#8E9299] hover:text-white'}`} title="Mute">
               {track.muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
@@ -78,7 +83,10 @@ export const TrackRow = React.memo(function TrackRow({
             </button>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-1">
+        
+        {!track.minimized && (
+          <>
+            <div className="flex items-center justify-between gap-1">
           <select 
             value={track.instrument}
             onChange={(e) => onUpdateTrack(trackIndex, { instrument: e.target.value })}
@@ -204,7 +212,7 @@ export const TrackRow = React.memo(function TrackRow({
           </div>
         </div>
 
-        {track.type === 'melodic' && track.instrument !== 'sampler' && (
+        {track.instrument.includes('piano') && (
           <div className="mt-1 flex items-center justify-between gap-2 border-t border-[#2a2b30] pt-1">
             <span className="text-[0.5625rem] font-bold text-[#8E9299]">PITCH</span>
             <div className="flex gap-1" title="Default note when you click a step">
@@ -417,19 +425,18 @@ export const TrackRow = React.memo(function TrackRow({
               className="custom-slider w-full" style={{ '--thumb-color': '#FFAA00' } as any}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[0.625rem] font-bold text-[#8E9299] w-8">STEPS</span>
-            <input 
-              type="number" min="1" max={bars * 16} value={track.stepsCount || bars * 16} 
-              onChange={e => onUpdateTrack(trackIndex, { stepsCount: parseInt(e.target.value) || bars * 16 })} 
-              className="bg-[#1a1a1a] text-[#8E9299] text-xs w-full rounded border border-[#333] px-1 outline-none"
-            />
-          </div>
         </div>
+          
+        <button onClick={() => onOpenAdvanced(trackIndex)} className="w-full mt-1 bg-[#1a1a1a] hover:bg-[#333] border border-[#333] rounded p-1 flex items-center justify-center gap-1 text-[0.625rem] font-bold text-[#8E9299] hover:text-white transition-colors">
+          <Sliders className="w-3 h-3" />
+          ADVANCED
+        </button>
+        </>
+        )}
       </div>
 
       {/* Steps */}
-      <div className="flex items-center p-3 sm:p-4 bg-[#1a1b20]">
+      <div className={`flex items-center p-3 sm:p-4 bg-[#1a1b20] ${track.minimized ? 'py-1 opacity-60' : ''}`}>
         {Array.from({ length: bars * 16 }).map((_, stepIndex) => {
           const actualStepIndex = stepIndex % (track.stepsCount || bars * 16);
           const step = track.steps?.[actualStepIndex] || { active: false, note: track.defaultNote || 'C4', velocity: 0.8, duration: '16n', offset: 0 };
@@ -437,17 +444,23 @@ export const TrackRow = React.memo(function TrackRow({
           return (
             <React.Fragment key={stepIndex}>
               {stepIndex > 0 && stepIndex % 16 === 0 && <div className="h-full w-px bg-[#444] mx-2 sm:mx-3 flex-shrink-0"></div>}
-              <div className={`flex-shrink-0 relative step-container step-container-${stepIndex} ${stepIndex % 4 === 0 && stepIndex % 16 !== 0 ? "ml-2 sm:ml-3" : "ml-1 sm:ml-1.5"} ${isGhost ? 'opacity-40' : ''}`}>
-                <StepButton
-                  trackId={track.id}
-                  stepIndex={actualStepIndex}
-                  step={step}
-                  color={track.color}
-                  isActive={step.active}
-                  onToggle={onToggleStep}
-                  onOpenSettings={onOpenSettings}
-                />
-                <div className="playhead-indicator absolute -top-3 -bottom-[13px] sm:-top-4 sm:-bottom-[17px] left-1/2 -translate-x-1/2 w-0.5 bg-[#FF4444] opacity-80 z-10 pointer-events-none shadow-[0_0_8px_#FF4444]" />
+              <div className={`flex-shrink-0 flex items-center justify-center relative step-container step-container-${stepIndex} ${stepIndex % 4 === 0 && stepIndex % 16 !== 0 ? "ml-2 sm:ml-3" : "ml-1 sm:ml-1.5"} ${isGhost ? 'opacity-40' : ''}`} style={track.minimized ? { width: '8px', height: '8px', margin: '0 2px' } : undefined}>
+                {track.minimized ? (
+                  <div className={`w-2 h-2 rounded-full ${step.active ? '' : 'bg-[#333]'}`} style={step.active ? { backgroundColor: track.color, boxShadow: `0 0 6px ${track.color}80` } : undefined}></div>
+                ) : (
+                  <>
+                    <StepButton
+                      trackId={track.id}
+                      stepIndex={actualStepIndex}
+                      step={step}
+                      color={track.color}
+                      isActive={step.active}
+                      onToggle={onToggleStep}
+                      onOpenSettings={onOpenSettings}
+                    />
+                    <div className="playhead-indicator absolute -top-3 -bottom-[13px] sm:-top-4 sm:-bottom-[17px] left-1/2 -translate-x-1/2 w-0.5 bg-[#FF4444] opacity-80 z-10 pointer-events-none shadow-[0_0_8px_#FF4444]" />
+                  </>
+                )}
               </div>
             </React.Fragment>
           );

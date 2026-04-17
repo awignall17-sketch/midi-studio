@@ -56,6 +56,25 @@ html.light .hover\:bg-\[\#444\]:hover { background-color: #d1d5db !important; }
 html.light .hover\:text-white:hover { color: #000000 !important; }
 html.light .hover\:border-\[\#555\]:hover { border-color: #94a3b8 !important; }
 
+/* Red and Blue to Gray/Black overrides for Light Mode */
+html.light .bg-\[\#FF4444\] { background-color: #333333 !important; }
+html.light .hover\:bg-\[\#ff5555\]:hover { background-color: #111111 !important; }
+html.light .hover\:text-\[\#FF4444\]:hover { color: #111111 !important; }
+html.light .text-\[\#FF4444\] { color: #333333 !important; }
+html.light .border-\[\#FF4444\] { border-color: #333333 !important; }
+html.light .bg-\[\#FF4444\]\/20 { background-color: rgba(50, 50, 50, 0.1) !important; }
+html.light .shadow-\[0_0_8px_\#FF4444\] { box-shadow: 0 0 8px rgba(0,0,0,0.3) !important; }
+
+html.light .bg-\[\#00AAFF\] { background-color: #777777 !important; }
+html.light .hover\:bg-\[\#33bbff\]:hover { background-color: #555555 !important; }
+html.light .hover\:bg-\[\#0099ee\]:hover { background-color: #555555 !important; }
+html.light .hover\:text-\[\#00AAFF\]:hover { color: #555555 !important; }
+html.light .text-\[\#00AAFF\] { color: #777777 !important; }
+html.light .border-\[\#00AAFF\] { border-color: #777777 !important; }
+html.light .bg-\[\#00AAFF\]\/20 { background-color: rgba(100, 100, 100, 0.1) !important; }
+html.light .bg-\[\#00AAFF\]\/30 { background-color: rgba(100, 100, 100, 0.15) !important; }
+html.light .shadow-\[0_0_15px_rgba\(255\,68\,68\,0\.3\)\] { box-shadow: 0 0 15px rgba(0,0,0,0.1) !important; }
+
 /* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar { width: 10px; height: 10px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 4px; }
@@ -116,3 +135,8 @@ html.light .step-container.is-current .step-btn[style*="background-color: transp
 .step-container.is-current .step-btn:not([style*="background-color: transparent"]) { opacity: 1 !important; }
 .step-container.is-current .timeline-text { color: #FF4444 !important; }
 
+/* Zoom / Accessibility Levels */
+html.zoom-1 { font-size: 16px; }
+html.zoom-2 { font-size: 12px; }
+html.zoom-2-5 { font-size: 10px; }
+html.zoom-3 { font-size: 8px; }
