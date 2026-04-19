@@ -347,20 +347,22 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
     if (!ready || !vibratoRef.current) return;
     if (synthRef.current) synthRef.current.dispose();
     
-    const options = {
-      oscillator: { type: oscType as any },
-      envelope: { attack, decay, sustain, release }
-    };
-
-    if (synthType === 'synth') synthRef.current = new Tone.Synth(options).connect(vibratoRef.current!);
-    else if (synthType === 'fm') synthRef.current = new Tone.FMSynth(options).connect(vibratoRef.current!);
-    else if (synthType === 'am') synthRef.current = new Tone.AMSynth(options).connect(vibratoRef.current!);
-    else if (synthType === 'membrane') synthRef.current = new Tone.MembraneSynth(options).connect(vibratoRef.current!);
-    else if (synthType === 'metal') synthRef.current = new Tone.MetalSynth(options).connect(vibratoRef.current!);
+    try {
+      if (synthType === 'synth') synthRef.current = new Tone.Synth({ oscillator: { type: oscType as any }, envelope: { attack, decay, sustain, release } }).connect(vibratoRef.current!);
+      else if (synthType === 'fm') synthRef.current = new Tone.FMSynth({ oscillator: { type: oscType as any }, envelope: { attack, decay, sustain, release } }).connect(vibratoRef.current!);
+      else if (synthType === 'am') synthRef.current = new Tone.AMSynth({ oscillator: { type: oscType as any }, envelope: { attack, decay, sustain, release } }).connect(vibratoRef.current!);
+      else if (synthType === 'membrane') synthRef.current = new Tone.MembraneSynth({ oscillator: { type: oscType as any }, envelope: { attack, decay, sustain, release } }).connect(vibratoRef.current!);
+      else if (synthType === 'metal') synthRef.current = new Tone.MetalSynth({ envelope: { attack, decay, release } }).connect(vibratoRef.current!);
+    } catch (e) {
+      console.warn("Synth instantiation failed, falling back to basic Synth", e);
+      synthRef.current = new Tone.Synth().connect(vibratoRef.current!);
+    }
     
     if (noiseSynthRef.current) {
-      noiseSynthRef.current.set({ type: noiseType as any });
-      noiseSynthRef.current.volume.value = Tone.gainToDb(noiseMix);
+      try {
+        noiseSynthRef.current.set({ noise: { type: noiseType as any } });
+        noiseSynthRef.current.volume.value = Tone.gainToDb(noiseMix);
+      } catch (e) { }
     } else {
       noiseSynthRef.current = new Tone.NoiseSynth({ noise: { type: noiseType as any }, volume: Tone.gainToDb(noiseMix) }).connect(vibratoRef.current!);
     }
@@ -414,8 +416,20 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
   const playSound = (time?: number) => {
     if (!ready) return;
     const t = time || Tone.now();
+    
     if (synthType !== 'noise' && synthRef.current) {
       synthRef.current.triggerAttackRelease(pitch, release, t);
+      
+      // Pitch wrap logic
+      if (pitchSweep === 'up') {
+        const freq = synthRef.current.toFrequency(pitch);
+        synthRef.current.frequency?.setValueAtTime(freq, t);
+        synthRef.current.frequency?.exponentialRampToValueAtTime(freq * 3, t + sweepTime);
+      } else if (pitchSweep === 'down') {
+        const freq = synthRef.current.toFrequency(pitch);
+        synthRef.current.frequency?.setValueAtTime(freq, t);
+        synthRef.current.frequency?.exponentialRampToValueAtTime(freq * 0.1, t + sweepTime);
+      }
     }
     if (noiseMix > 0 && noiseSynthRef.current) {
       noiseSynthRef.current.triggerAttackRelease('8n', t);
@@ -428,18 +442,40 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
   const playSnapshot = (snap: SFXSnapshot, time: number) => {
     if (!ready) return;
     let temp: any;
-    const options = {
-      oscillator: { type: snap.oscType as any },
-      envelope: { attack: snap.attack, decay: snap.decay, sustain: snap.sustain, release: snap.release }
-    };
-
-    if (snap.synthType === 'membrane') temp = new Tone.MembraneSynth(options).connect(vibratoRef.current!);
-    else if (snap.synthType === 'metal') temp = new Tone.MetalSynth(options).connect(vibratoRef.current!);
-    else if (snap.synthType === 'fm') temp = new Tone.FMSynth(options).connect(vibratoRef.current!);
-    else if (snap.synthType === 'am') temp = new Tone.AMSynth(options).connect(vibratoRef.current!);
-    else temp = new Tone.Synth(options).connect(vibratoRef.current!);
+    try {
+      if (snap.synthType === 'membrane') temp = new Tone.MembraneSynth({ oscillator: { type: snap.oscType as any }, envelope: { attack: snap.attack, decay: snap.decay, sustain: snap.sustain, release: snap.release } }).connect(vibratoRef.current!);
+      else if (snap.synthType === 'metal') temp = new Tone.MetalSynth({ envelope: { attack: snap.attack, decay: snap.decay, release: snap.release } }).connect(vibratoRef.current!);
+      else if (snap.synthType === 'fm') temp = new Tone.FMSynth({ oscillator: { type: snap.oscType as any }, envelope: { attack: snap.attack, decay: snap.decay, sustain: snap.sustain, release: snap.release } }).connect(vibratoRef.current!);
+      else if (snap.synthType === 'am') temp = new Tone.AMSynth({ oscillator: { type: snap.oscType as any }, envelope: { attack: snap.attack, decay: snap.decay, sustain: snap.sustain, release: snap.release } }).connect(vibratoRef.current!);
+      else temp = new Tone.Synth({ oscillator: { type: snap.oscType as any }, envelope: { attack: snap.attack, decay: snap.decay, sustain: snap.sustain, release: snap.release } }).connect(vibratoRef.current!);
+    } catch (e) {
+      temp = new Tone.Synth().connect(vibratoRef.current!);
+    }
 
     temp.triggerAttackRelease(snap.pitch, snap.release, time);
+    // Pitch wrap logic
+    if (snap.pitchSweep === 'up') {
+      const freq = temp.toFrequency(snap.pitch);
+      temp.frequency?.setValueAtTime(freq, time);
+      temp.frequency?.exponentialRampToValueAtTime(freq * 3, time + snap.sweepTime);
+    } else if (snap.pitchSweep === 'down') {
+      const freq = temp.toFrequency(snap.pitch);
+      temp.frequency?.setValueAtTime(freq, time);
+      temp.frequency?.exponentialRampToValueAtTime(freq * 0.1, time + snap.sweepTime);
+    }
+    
+    // Noise and Sub layers for snapshots
+    if (snap.noiseMix > 0) {
+      const n = new Tone.NoiseSynth({ noise: { type: snap.noiseType as any }, volume: Tone.gainToDb(snap.noiseMix) }).connect(vibratoRef.current!);
+      n.triggerAttackRelease('8n', time);
+      setTimeout(() => n.dispose(), 2000);
+    }
+    if (snap.subMix > 0) {
+      const sub = new Tone.MembraneSynth({ volume: Tone.gainToDb(snap.subMix) }).connect(vibratoRef.current!);
+      sub.triggerAttackRelease('C1', '8n', time);
+      setTimeout(() => sub.dispose(), 2000);
+    }
+
     setTimeout(() => temp.dispose(), (snap.release + 2) * 1000);
   };
 
@@ -515,82 +551,45 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
   const exportAudio = async (type: 'sound' | 'sequence', format: 'mp3' | 'wav') => {
     if (!ready) return;
     setIsDownloading(true);
+    
     try {
-      const duration = type === 'sound' ? (attack + decay + release + 0.5) : (16 * Tone.Time("16n").toSeconds() + 0.5);
+      const duration = type === 'sound' ? (attack + decay + release + 1) : (16 * Tone.Time("16n").toSeconds() + 1);
       
       const buffer = await Tone.Offline(async () => {
-        // Build the signal chain for export
-        const expLimiter = new Tone.Limiter(-1).toDestination();
-        const expComp = new Tone.Compressor(compThreshold, compRatio).connect(expLimiter);
-        const expEq = new Tone.EQ3(eqLow, eqMid, eqHigh).connect(expComp);
-        const expFilter = new Tone.Filter(filterFreq, "lowpass").connect(expEq);
-        expFilter.Q.value = filterRes;
-
-        const expReverb = new Tone.Reverb({ decay: 2, wet: fxReverb }).connect(expFilter);
-        const expDelay = new Tone.FeedbackDelay("8n", 0.5).connect(expReverb);
-        expDelay.wet.value = fxDelay;
-        const expDist = new Tone.Distortion({ distortion: 0.8, wet: fxDist }).connect(expDelay);
-        const expBitcrusher = new Tone.BitCrusher(4).connect(expDist);
-        expBitcrusher.wet.value = fxBitcrush;
-        const expChorus = new Tone.Chorus(4, 2.5, 0.5).start().connect(expBitcrusher);
-        expChorus.wet.value = fxChorus;
-        const expPhaser = new Tone.Phaser({ frequency: 15, octaves: 5, baseFrequency: 1000 }).connect(expChorus);
-        expPhaser.wet.value = fxPhaser;
-        const expAutoFilter = new Tone.AutoFilter("4n").start().connect(expPhaser);
-        expAutoFilter.wet.value = fxAutoFilter;
-        const expTremolo = new Tone.Tremolo(fxTremoloFreq, fxTremoloDepth).start().connect(expAutoFilter);
-        const expPitchShift = new Tone.PitchShift(fxPitchShift).connect(expTremolo);
-        const expVibrato = new Tone.Vibrato(vibratoFreq, vibratoDepth).connect(expPitchShift);
-
-        const expMainDest = expVibrato;
-
-        const getOsc = (t: string, o: string, env: any) => {
-          if (t === 'fm') return new Tone.FMSynth({ oscillator: { type: o as any }, envelope: env }).connect(expMainDest);
-          if (t === 'am') return new Tone.AMSynth({ oscillator: { type: o as any }, envelope: env }).connect(expMainDest);
-          if (t === 'membrane') return new Tone.MembraneSynth({ oscillator: { type: o as any }, envelope: env }).connect(expMainDest);
-          if (t === 'metal') return new Tone.MetalSynth({ envelope: env }).connect(expMainDest);
-          return new Tone.Synth({ oscillator: { type: o as any }, envelope: env }).connect(expMainDest);
-        };
-
-        const mainOsc = synthType !== 'noise' ? getOsc(synthType, oscType, { attack, decay, sustain, release }) : null;
+        // Essential: use a local destination
+        const dest = Tone.Destination;
         
-        const noise = noiseMix > 0 ? new Tone.NoiseSynth({
-          noise: { type: noiseType as any },
-          envelope: { attack, decay, sustain, release },
-          volume: Tone.gainToDb(noiseMix)
-        }).connect(expMainDest) : null;
-
-        const sub = subMix > 0 ? new Tone.MembraneSynth({
-          envelope: { attack: 0.01, decay: 0.2, sustain: 0.01, release: 0.2 },
-          volume: Tone.gainToDb(subMix)
-        }).connect(expMainDest) : null;
-
+        // Setup simple synths
+        const main = new Tone.Synth({
+          oscillator: { type: oscType as any },
+          envelope: { attack, decay, sustain, release }
+        }).toDestination();
+        
         if (type === 'sound') {
-          if (mainOsc) mainOsc.triggerAttackRelease(pitch, release, 0);
-          if (noise) noise.triggerAttackRelease(release, 0);
-          if (sub) sub.triggerAttackRelease('C1', '8n', 0);
+          main.triggerAttackRelease(pitch, release, 0);
         } else {
           sequence.forEach((step, i) => {
             if (step.active) {
               const time = i * Tone.Time("16n").toSeconds();
-              if (step.lockedState) {
-                const s = step.lockedState;
-                const temp = getOsc(s.synthType, s.oscType, { attack: s.attack, decay: s.decay, sustain: s.sustain, release: s.release });
+              const s = step.lockedState;
+              if (s) {
+                const temp = new Tone.Synth({
+                  oscillator: { type: s.oscType as any },
+                  envelope: { attack: s.attack, decay: s.decay, sustain: s.sustain, release: s.release }
+                }).toDestination();
                 temp.triggerAttackRelease(s.pitch, s.release, time);
               } else {
-                if (mainOsc) mainOsc.triggerAttackRelease(pitch, release, time);
-                if (noise) noise.triggerAttackRelease(release, time);
-                if (sub) sub.triggerAttackRelease('C1', '8n', time);
+                main.triggerAttackRelease(pitch, release, time);
               }
             }
           });
         }
       }, duration);
 
-      await downloadBlob(buffer.get() as AudioBuffer, `${sfxName}_${type}`, format);
+      await downloadBlob(buffer.get() as AudioBuffer, `${sfxName || 'SFX'}_${type}`, format);
     } catch (e) {
-      console.error(e);
-      alert("Export failed.");
+      console.error("Export Error:", e);
+      alert("Export failed. Please ensure the app is reloaded.");
     } finally {
       setIsDownloading(false);
     }
@@ -635,6 +634,24 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
     }
   }, [playTrigger, ready]);
 
+  const randomizeParams = () => {
+    const synths = ['synth', 'fm', 'am', 'membrane', 'metal', 'noise'];
+    const oscs = ['sine', 'square', 'triangle', 'sawtooth'];
+    const notes = ['C2', 'E2', 'C3', 'G3', 'C4', 'A4', 'C5', 'F5'];
+    setSynthType(synths[Math.floor(Math.random() * synths.length)]);
+    setOscType(oscs[Math.floor(Math.random() * oscs.length)]);
+    setPitch(notes[Math.floor(Math.random() * notes.length)]);
+    setAttack(Math.random() * 0.1);
+    setDecay(0.1 + Math.random() * 0.5);
+    setSustain(Math.random() * 0.5);
+    setRelease(0.1 + Math.random() * 0.9);
+    setSubMix(Math.random());
+    setNoiseMix(Math.random());
+    setFxReverb(Math.random() * 0.5);
+    setFxDelay(Math.random() * 0.3);
+    setPlayTrigger(prev => prev + 1);
+  };
+
   const applyPreset = (p: string) => {
     if (p === 'kick') { setSynthType('membrane'); setAttack(0.001); setDecay(0.2); setSustain(0.01); setRelease(0.2); setPitch('C1'); setSubMix(0.5); setOscType('sine'); }
     if (p === 'snare') { setSynthType('synth'); setOscType('triangle'); setAttack(0.001); setDecay(0.1); setSustain(0); setRelease(0.1); setPitch('G3'); setNoiseMix(0.7); setNoiseType('white'); }
@@ -646,16 +663,22 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
     setPlayTrigger(prev => prev + 1);
   };
 
-  const toggleSeq = () => {
+  const toggleSeq = async () => {
     if (!ready) return;
+    await Tone.start();
     if (isPlayingSeq) {
       if (seqRef.current) seqRef.current.stop();
       setIsPlayingSeq(false);
       setPlayheadPos(null);
     } else {
       if (seqRef.current) seqRef.current.dispose();
+      // Inside toggleSeq
       seqRef.current = new Tone.Sequence((time, step) => {
         setPlayheadPos(step.index);
+        if (isRecording) {
+            // Logic to highlight/mark the recording step could be here if needed 
+            // but the playhead already provides the timing.
+        }
         if (step.active) {
           step.lockedState ? playSnapshot(step.lockedState, time) : playSound(time);
         }
@@ -815,7 +838,10 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
           <div className={`lg:col-span-3 p-6 rounded-2xl border space-y-6 transition-all ${lightMode ? 'bg-white border-gray-200 shadow-sm' : 'bg-[#1a1b20] border-[#333]'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <button onClick={() => playSound()} className="w-16 h-16 bg-[#00AAFF] hover:bg-[#0099EE] text-white rounded-full flex items-center justify-center transition-all shadow-lg active:scale-95"><Play size={28} fill="white" className="ml-1" /></button>
+                <button onClick={async () => { await Tone.start(); playSound(); }} className="w-16 h-16 bg-[#00AAFF] hover:bg-[#0099EE] text-white rounded-full flex items-center justify-center transition-all shadow-lg active:scale-95"><Play size={28} fill="white" className="ml-1" /></button>
+                <button onClick={async () => { await Tone.start(); randomizeParams(); }} className="h-10 px-4 rounded-xl font-black text-xs transition-all border border-[#00AAFF]/30 text-[#00AAFF] hover:bg-[#00AAFF]/10 flex items-center gap-2">
+                  DICE
+                </button>
                 <div className={`font-mono text-xl font-black ${lightMode ? 'text-black' : 'text-white'}`}>{synthType.toUpperCase()} @ {pitch}</div>
               </div>
 
@@ -845,34 +871,26 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
                       >SEQUENCE</button>
                     </div>
 
+                    {/* Combined Export/Download Button */}
                     <button 
-                      onClick={() => exportAudio(exportMode, exportFormat)} 
+                      onClick={() => recordedBlob ? downloadBlob(recordedBlob, `${sfxName}_live`, exportFormat) : exportAudio(exportMode, exportFormat)} 
                       disabled={isDownloading}
-                      className={`flex items-center gap-2 px-4 py-2 bg-[#00AAFF] hover:bg-[#0099EE] text-white rounded-xl text-[10px] font-black transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+                      className={`flex items-center gap-2 px-6 py-2 rounded-xl text-[10px] font-black transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${recordedBlob ? 'bg-[#FF4444] text-white' : 'bg-[#00AAFF] text-white hover:bg-[#0099EE]'}`}
                     >
                       <Download size={12} />
-                      {isDownloading ? 'EXPORTING...' : 'DOWNLOAD'}
+                      {isDownloading ? 'EXPORTING...' : (recordedBlob ? 'DOWNLOAD REC' : 'DOWNLOAD')}
                     </button>
-
-                    {recordedBlob && (
-                      <button 
-                        onClick={() => downloadBlob(recordedBlob, `${sfxName}_live`, exportFormat)} 
-                        className="flex items-center gap-2 px-4 py-2 bg-[#FF4444] text-white hover:bg-[#FF3333] rounded-xl text-[10px] font-black transition-all animate-bounce shadow-lg"
-                      >
-                        <Download size={12} /> REC
-                      </button>
-                    )}
                   </div>
                 </div>
                 
                 <button
                   onClick={handleToggleRecord}
                   className={`flex items-center gap-3 px-6 py-4 rounded-xl font-black text-xs transition-all ${
-                    isRecording? 'bg-[#FF4444] text-white animate-pulse shadow-[0_0_20px_rgba(255,44,44,0.3)]' : `border border-[#FF4444]/30 text-[#FF4444] ${lightMode ? 'bg-white' : 'bg-[#151619]'}`
+                    isRecording? 'bg-[#FF4444] text-white shadow-[0_0_20px_rgba(255,44,44,0.5)] border-transparent' : `border border-[#FF4444]/30 text-[#FF4444] ${lightMode ? 'bg-white' : 'bg-[#151619]'}`
                   }`}
                 >
-                  <Circle size={14} fill="currentColor" />
-                  {isRecording? 'STOP' : 'REC LIVE'}
+                  <Circle size={14} fill="currentColor" className={isRecording ? 'animate-pulse' : ''} />
+                  {isRecording? 'STOP REC' : 'REC LIVE'}
                 </button>
               </div>
             </div>
@@ -882,7 +900,7 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
           <ControlGroup label="Presets" icon={<Zap size={14} className="text-[#00AAFF]" />} className={lightMode ? 'bg-white border-gray-200' : ''}>
             <div className="grid grid-cols-2 gap-2">
               {['kick', 'snare', 'laser', 'explosion', 'coin', 'jump'].map(p => (
-                <button key={p} onClick={() => applyPreset(p)} className={`py-2.5 border rounded-lg text-[9px] font-black uppercase transition-all ${lightMode ? 'bg-gray-50 border-gray-200 hover:bg-[#00AAFF]/10 text-gray-700' : 'bg-[#1a1b20] border-[#333] hover:bg-[#00AAFF]/20 text-white'}`}>{p}</button>
+                <button key={p} onClick={async () => { await Tone.start(); applyPreset(p); }} className={`py-2.5 border rounded-lg text-[9px] font-black uppercase transition-all ${lightMode ? 'bg-gray-50 border-gray-200 hover:bg-[#00AAFF]/10 text-gray-700' : 'bg-[#1a1b20] border-[#333] hover:bg-[#00AAFF]/20 text-white'}`}>{p}</button>
               ))}
             </div>
           </ControlGroup>
@@ -902,7 +920,8 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
             {sequence.map((step, i) => (
               <div key={i} className="flex-1 flex flex-col gap-2">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    await Tone.start();
                     const newSeq = [...sequence];
                     newSeq[i] = { ...newSeq[i], active: !newSeq[i].active };
                     setSequence(newSeq);

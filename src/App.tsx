@@ -653,6 +653,20 @@ export default function App() {
 
   const toggleStep = React.useCallback((trackId: string, stepIndex: number) => {
     commitHistory();
+    
+    // Play sound side effect outside of React's state updater to prevent double triggers
+    const track = tracksRef.current.find(t => t.id === trackId);
+    if (track) {
+      const defaultStep = { active: false, note: track.defaultNote || 'C4', velocity: defaultVelocityRef.current, duration: '16n', offset: 0, stepSpan: 1 };
+      const step = track.steps[stepIndex] || defaultStep;
+      if (!step.active) { // we are turning it ON
+        const span = step.stepSpan || 1;
+        const duration = span > 1 ? span * Tone.Time('16n').toSeconds() : step.duration || '16n';
+        const velocity = step.velocity ?? defaultVelocityRef.current;
+        engine.playNote(track.id, step.note || track.defaultNote || 'C4', velocity, Tone.now() + 0.02, duration, 0);
+      }
+    }
+
     setTracks(prevTracks => {
       const newTracks = prevTracks.map((track) => {
         if (track.id === trackId) {
@@ -661,12 +675,6 @@ export default function App() {
           const step = { ...(newSteps[stepIndex] || defaultStep) };
           step.active = !step.active;
           newSteps[stepIndex] = step;
-          
-          if (step.active) {
-            const span = step.stepSpan || 1;
-            const duration = span > 1 ? span * Tone.Time('16n').toSeconds() : step.duration;
-            engine.playNote(track.id, step.note, step.velocity, Tone.now() + 0.02, duration, 0);
-          }
           return { ...track, steps: newSteps };
         }
         return track;
