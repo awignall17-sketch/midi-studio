@@ -426,11 +426,6 @@ export const TrackRow = React.memo(function TrackRow({
             />
           </div>
         </div>
-          
-        <button onClick={() => onOpenAdvanced(trackIndex)} className="w-full mt-1 bg-[#1a1a1a] hover:bg-[#333] border border-[#333] rounded p-1 flex items-center justify-center gap-1 text-[0.625rem] font-bold text-[#8E9299] hover:text-white transition-colors">
-          <Sliders className="w-3 h-3" />
-          ADVANCED
-        </button>
         </>
         )}
       </div>
@@ -452,11 +447,9 @@ export const TrackRow = React.memo(function TrackRow({
                     <StepButton
                       trackId={track.id}
                       stepIndex={actualStepIndex}
-                      step={step}
                       color={track.color}
                       isActive={step.active}
                       onToggle={onToggleStep}
-                      onOpenSettings={onOpenSettings}
                     />
                     <div className="playhead-indicator absolute -top-3 -bottom-[13px] sm:-top-4 sm:-bottom-[17px] left-1/2 -translate-x-1/2 w-0.5 bg-[#FF4444] opacity-80 z-10 pointer-events-none shadow-[0_0_8px_#FF4444]" />
                   </>

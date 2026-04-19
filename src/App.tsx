@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as Tone from 'tone';
 import { Mp3Encoder } from '@breezystack/lamejs';
-import { Play, Square, Circle, Download, Volume2, VolumeX, Settings2, Bell, BellOff, Plus, Minus, Trash2, PlusCircle, SlidersHorizontal, Save, FolderOpen, Undo2, Redo2, Upload, BookOpen, X, Copy, ArrowLeft, ArrowRight, Eraser, CopyPlus, ChevronUp, ChevronDown, Loader2, Repeat, Timer, HelpCircle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Play, Square, Circle, Download, Volume2, VolumeX, Settings2, Bell, BellOff, Plus, Minus, Trash2, PlusCircle, SlidersHorizontal, Save, FolderOpen, Undo2, Redo2, Upload, BookOpen, X, Copy, ArrowLeft, ArrowRight, Eraser, CopyPlus, ChevronUp, ChevronDown, Loader2, Repeat, Timer, HelpCircle, Music, Mic2, Waves, Zap, Speaker, Keyboard, Info } from 'lucide-react';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { engine } from './audio';
 import { TrackData, StepData, TrackTemplate } from './types';
 import { audioBufferToWav } from './utils';
@@ -17,28 +17,136 @@ import { HelpModal } from './components/HelpModal';
 const createEmptySteps = (length: number, defaultNote: string) => 
   Array.from({ length }, () => ({ active: false, note: defaultNote, velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 }));
 
-const PlaybackTracker = () => {
+const PlaybackTracker = ({ performanceMode }: { performanceMode: boolean }) => {
   const [time, setTime] = useState(0);
+  const [progress, setProgress] = useState(0);
+
   useEffect(() => {
     let animationFrame: number;
     const updateTime = () => {
       setTime(Tone.Transport.seconds);
-      animationFrame = requestAnimationFrame(updateTime);
+      if (Tone.Transport.state === 'started') {
+        const totalDuration = Tone.Transport.loopEnd as number;
+        setProgress((Tone.Transport.seconds % totalDuration) / totalDuration);
+      } else {
+        setProgress(0);
+      }
+      if (!performanceMode) {
+        animationFrame = requestAnimationFrame(updateTime);
+      }
     };
+
+    if (performanceMode) {
+      const interval = setInterval(() => {
+        setTime(Tone.Transport.seconds);
+        if (Tone.Transport.state === 'started') {
+          const totalDuration = Tone.Transport.loopEnd as number;
+          setProgress((Tone.Transport.seconds % totalDuration) / totalDuration);
+        } else {
+          setProgress(0);
+        }
+      }, 500); // Only update twice a second in performance mode
+      return () => clearInterval(interval);
+    }
+
     animationFrame = requestAnimationFrame(updateTime);
     return () => cancelAnimationFrame(animationFrame);
-  }, []);
+  }, [performanceMode]);
 
   const d = new Date(time * 1000);
   const m = d.getUTCMinutes().toString().padStart(2, '0');
   const s = d.getUTCSeconds().toString().padStart(2, '0');
-  const ms = Math.floor(d.getUTCMilliseconds() / 10).toString().padStart(2, '0');
   
   return (
-    <div className="flex flex-col items-center justify-center bg-[#1a1a1a] p-2 rounded-lg border border-[#333] min-w-24">
-      <div className="text-[0.625rem] text-[#8E9299] font-bold">TIME</div>
-      <div className="text-sm font-mono text-[#00AAFF] font-bold mt-0.5">{m}:{s}.{ms}</div>
+    <div className="flex flex-col gap-1 min-w-[120px]">
+      <div className="flex items-center justify-between bg-[#1a1a1a] px-3 py-1.5 rounded-lg border border-[#333]">
+        <div className="flex flex-col">
+          <span className="text-[10px] text-[#8E9299] font-bold leading-none">ELAPSED</span>
+          <span className="text-sm font-mono text-[#00AAFF] font-bold mt-1">{m}:{s}</span>
+        </div>
+        <div className="h-8 w-px bg-[#333] mx-2" />
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] text-[#8E9299] font-bold leading-none">POSITION</span>
+          <span className="text-sm font-mono text-white font-bold mt-1">{Math.floor(progress * 100)}%</span>
+        </div>
+      </div>
+      <div className="w-full h-1 bg-[#1a1a1a] rounded-full overflow-hidden border border-[#333]">
+        <div 
+          className="h-full bg-[#00AAFF] transition-all duration-100 ease-linear" 
+          style={{ width: `${progress * 100}%` }} 
+        />
+      </div>
     </div>
+  );
+};
+
+interface HelpCardProps {
+  key?: any;
+  title: string;
+  icon: any;
+  description: string;
+  details: string[];
+  isExpanded: boolean;
+  onToggle: () => void;
+}
+
+const HelpCard = ({ 
+  title, 
+  icon: Icon, 
+  description, 
+  details, 
+  isExpanded, 
+  onToggle 
+}: HelpCardProps) => {
+  return (
+    <motion.div 
+      layout
+      onClick={onToggle}
+      className={`p-6 rounded-2xl border transition-all cursor-pointer select-none ${
+        isExpanded 
+          ? 'bg-[#1a1b20] border-[#00AAFF] shadow-[0_0_40px_rgba(0,170,255,0.15)] md:col-span-2' 
+          : 'bg-[#151619] border-[#333] hover:border-[#444] hover:bg-[#1a1b20]'
+      }`}
+    >
+      <div className="flex items-center gap-4 mb-3">
+        <div className={`p-2.5 rounded-xl transition-colors ${isExpanded ? 'bg-[#00AAFF] text-white' : 'bg-[#1a1b20] text-[#00AAFF]'}`}>
+          <Icon size={22} />
+        </div>
+        <h3 className={`font-black uppercase tracking-tight transition-all ${isExpanded ? 'text-white text-lg' : 'text-[#8E9299] text-sm'}`}>
+          {title}
+        </h3>
+      </div>
+      <p className={`text-xs leading-relaxed transition-colors ${isExpanded ? 'text-white/80' : 'text-[#8E9299]'}`}>
+        {description}
+      </p>
+      
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-6 pt-6 border-t border-[#333] space-y-4"
+          >
+            {details.map((detail, i) => (
+              <div key={i} className="flex gap-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#00AAFF] mt-1.5 shrink-0" />
+                <p className="text-xs text-white/70 leading-relaxed font-medium">{detail}</p>
+              </div>
+            ))}
+            <div className="mt-4 p-4 bg-[#00AAFF]/10 rounded-xl border border-[#00AAFF]/20 flex items-start gap-4">
+              <div className="p-2 bg-[#00AAFF] rounded-lg text-white">
+                <Zap size={14} fill="currentColor" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-[#00AAFF] uppercase tracking-widest">Master Hint</p>
+                <p className="text-[11px] text-[#00AAFF]/80 mt-1 italic leading-relaxed">Click again to collapse this card and explore other professional techniques.</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };
 
@@ -63,6 +171,77 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
   
+  const [expandedHelpCard, setExpandedHelpCard] = useState<number | null>(null);
+
+  const HELP_CARDS = [
+    {
+      title: "Sound Selection",
+      icon: Music,
+      description: "Professional beats start with high-quality samples. Learn how to pick the right sounds.",
+      details: [
+        "Pick Kicks that are punchy and short (40-60Hz) for modern trap.",
+        "Snares should hit hard on '2' and '4'. Layer a clap for extra texture.",
+        "Use the Sampler (Upload) to bring in industry-standard sample packs.",
+        "Synthesize custom drums in the SFX Studio for unique timbres."
+      ]
+    },
+    {
+      title: "Groove & Velocity",
+      icon: Zap,
+      description: "Robotic beats feel boring. Bounce comes from variation and human performance.",
+      details: [
+        "Right-click steps to lower velocity on ghost notes. This adds natural movement.",
+        "Use the global Swing slider to create a 'swung' feel for 16th note rhythms.",
+        "Slightly offset snares late for a lazy groove, or hi-hats early for urgency.",
+        "Try 1/32n steps in the Step Editor for rapid 'trap rattles' on hi-hats."
+      ]
+    },
+    {
+      title: "The Low End (808s)",
+      icon: Speaker,
+      description: "Tuning your bass to your kick is the secret to a professional mix.",
+      details: [
+        "Always tune your 808/Bass track to the root key of your song.",
+        "Keep the Bass centered (Pan = 0). Low frequencies should be mono.",
+        "EQ out everything below 20Hz and above 300Hz from your bass synth.",
+        "Ensure your Kick and 808 don't clash; let the kick provide the click, and 808 provide the tail."
+      ]
+    },
+    {
+      title: "FX & Depth",
+      icon: Waves,
+      description: "Create a 3D soundscape using Reverb, Delay, and Stereo width.",
+      details: [
+        "Add small amounts of Reverb to Snares and Melodies to place them in a 'room'.",
+        "Keep Kicks and Bass dry (0% Reverb) to maintain maximum punch.",
+        "Pan hi-hats and percussion left/right to widen the stereo image.",
+        "Use the Chorus effect on pads to make them lush and ethereal."
+      ]
+    },
+    {
+      title: "Melodic Textures",
+      icon: Mic2,
+      description: "Layer your melodies to create complex and rich arrangement foundations.",
+      details: [
+        "Layer a Piano with a subtle Pad to fill the frequency spectrum.",
+        "Use 8-Bit and Chiptune synths for retro, lo-fi accents.",
+        "Vary the duration of notes in the Step Editor for expressive melodies.",
+        "Try using the Filter sweep to create transition tension before a drop."
+      ]
+    },
+    {
+      title: "Workflow Speed",
+      icon: Keyboard,
+      description: "Master the studio tools to build entire songs in minutes, not hours.",
+      details: [
+        "Use 'USE IN MIDI' from SFX Studio to instantly transfer your custom sounds.",
+        "Toggle 'AUTO-STOP' when recording to get perfect, seamless export loops.",
+        "Duplicate tracks for easy layering of similar patterns.",
+        "Use Undo/Redo (Ctrl+Z / Ctrl+Y) to safely experiment with your mix."
+      ]
+    }
+  ];
+
   useEffect(() => {
     localStorage.setItem('track_templates', JSON.stringify(templates));
   }, [templates]);
@@ -1082,10 +1261,52 @@ export default function App() {
 
   if (appMode === 'sfx') {
     return (
-      <SFXStudio onBack={() => {
-        setStarted(false);
-        engine.stopAll();
-      }} />
+      <SFXStudio 
+        onBack={() => {
+          setStarted(false);
+          engine.stopAll();
+        }}
+        onAddToMIDI={(name, url) => {
+          setAppMode('midi');
+          // Add a new sampler track with this URL
+          const newTrack: TrackData = {
+            id: Math.random().toString(36).substr(2, 9),
+            name: name.toUpperCase(),
+            type: 'melodic',
+            instrument: 'sampler',
+            color: '#ff8800',
+            volume: 0,
+            pan: 0,
+            muted: false,
+            solo: false,
+            defaultNote: 'C4',
+            delayWet: 0,
+            reverbWet: 0,
+            distWet: 0,
+            chorusWet: 0,
+            bitcrusherWet: 0,
+            swing: 0,
+            steps: createEmptySteps(bars * 16, 'C4'),
+            sampleUrl: url,
+            sampleStart: 0,
+            sampleEnd: 1,
+            sampleReverse: false
+          };
+          setTracks(prev => [...prev, newTrack]);
+          // Notify engine
+          // Sync the new track to audio engine
+          const newTrackIndex = tracks.length;
+          const nt = newTrack;
+          setTimeout(() => engine.syncTrack(
+            nt.id, nt.instrument, nt.volume, nt.pan, nt.muted, 
+            nt.delayWet, nt.reverbWet, nt.distWet, nt.chorusWet, nt.bitcrusherWet, 
+            nt.sampleUrl, nt.sampleRootNote, nt.samplePlaybackSpeed, nt.sampleReverse, 
+            nt.sampleDuration, nt.sampleFade ?? true, nt.sampleStart ?? 0, nt.sampleEnd ?? 0,
+            nt.envelope, nt.filterCutoff ?? 20000, nt.filterResonance ?? 0,
+            nt.drive ?? 0, nt.lfoRate ?? 0, nt.ampMod ?? 0
+          ), 100);
+        }}
+      />
     );
   }
 
@@ -1107,7 +1328,7 @@ export default function App() {
                 title="Leave MIDI Studio"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span className="text-xs font-bold hidden sm:inline">BACK</span>
+                <span className="text-xs font-bold hidden sm:inline">HOME</span>
               </button>
               <h1 className="text-xl font-bold tracking-tighter text-[#FF4444]">MIDI STUDIO</h1>
               <button 
@@ -1493,38 +1714,65 @@ export default function App() {
 
               <AnimatePresence mode="popLayout">
                 {tracks.map((track, trackIndex) => (
-                  <motion.div 
-                    key={track.id} 
-                    layout 
-                    initial={{ opacity: 0, y: 20 }} 
-                    animate={{ opacity: 1, y: 0 }} 
-                    exit={{ opacity: 0, scale: 0.9 }} 
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                  >
-                    <TrackRow
-                      track={track}
-                      trackIndex={trackIndex}
-                      totalTracks={tracks.length}
-                      bars={bars}
-                      onUpdateTrack={updateTrack}
-                      onMoveTrackUp={moveTrackUp}
-                      onMoveTrackDown={moveTrackDown}
-                      onToggleMute={toggleMute}
-                      onToggleSolo={toggleSolo}
-                      onShiftTrackLeft={shiftTrackLeft}
-                      onShiftTrackRight={shiftTrackRight}
-                      onDuplicateTrack={duplicateTrack}
-                      onRandomizeTrack={randomizeTrack}
-                      onHumanizeTrack={humanizeTrack}
-                      onClearTrack={clearTrack}
-                      onDeleteTrack={deleteTrack}
-                      onSampleUpload={handleSampleUpload}
-                      onCommitHistory={commitHistory}
-                      onToggleStep={toggleStep}
-                      onOpenSettings={handleOpenSettings}
-                      onOpenAdvanced={(idx) => setAdvancedSettingsModal(idx)}
-                    />
-                  </motion.div>
+                  <div key={track.id}>
+                    {performanceMode ? (
+                      <TrackRow
+                        track={track}
+                        trackIndex={trackIndex}
+                        totalTracks={tracks.length}
+                        bars={bars}
+                        onUpdateTrack={updateTrack}
+                        onMoveTrackUp={moveTrackUp}
+                        onMoveTrackDown={moveTrackDown}
+                        onToggleMute={toggleMute}
+                        onToggleSolo={toggleSolo}
+                        onShiftTrackLeft={shiftTrackLeft}
+                        onShiftTrackRight={shiftTrackRight}
+                        onDuplicateTrack={duplicateTrack}
+                        onRandomizeTrack={randomizeTrack}
+                        onHumanizeTrack={humanizeTrack}
+                        onClearTrack={clearTrack}
+                        onDeleteTrack={deleteTrack}
+                        onSampleUpload={handleSampleUpload}
+                        onCommitHistory={commitHistory}
+                        onToggleStep={toggleStep}
+                        onOpenSettings={handleOpenSettings}
+                        onOpenAdvanced={(idx) => setAdvancedSettingsModal(idx)}
+                      />
+                    ) : (
+                      <motion.div 
+                        layout 
+                        initial={{ opacity: 0, y: 20 }} 
+                        animate={{ opacity: 1, y: 0 }} 
+                        exit={{ opacity: 0, scale: 0.9 }} 
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                      >
+                        <TrackRow
+                          track={track}
+                          trackIndex={trackIndex}
+                          totalTracks={tracks.length}
+                          bars={bars}
+                          onUpdateTrack={updateTrack}
+                          onMoveTrackUp={moveTrackUp}
+                          onMoveTrackDown={moveTrackDown}
+                          onToggleMute={toggleMute}
+                          onToggleSolo={toggleSolo}
+                          onShiftTrackLeft={shiftTrackLeft}
+                          onShiftTrackRight={shiftTrackRight}
+                          onDuplicateTrack={duplicateTrack}
+                          onRandomizeTrack={randomizeTrack}
+                          onHumanizeTrack={humanizeTrack}
+                          onClearTrack={clearTrack}
+                          onDeleteTrack={deleteTrack}
+                          onSampleUpload={handleSampleUpload}
+                          onCommitHistory={commitHistory}
+                          onToggleStep={toggleStep}
+                          onOpenSettings={handleOpenSettings}
+                          onOpenAdvanced={(idx) => setAdvancedSettingsModal(idx)}
+                        />
+                      </motion.div>
+                    )}
+                  </div>
                 ))}
               </AnimatePresence>
             </div>
@@ -1544,23 +1792,12 @@ export default function App() {
 
         {/* Instructions */}
         <div className="text-center text-[#8E9299] text-xs space-y-1">
-          <p>Click a step to toggle it. Long-press or right-click a step to adjust pitch, velocity, and hold duration.</p>
+          <p>Click a step to toggle it.</p>
           <p><strong>M</strong> = Mute track | <strong>S</strong> = Solo track (only soloed tracks will play)</p>
           <p>Recorded audio is automatically converted and saved in MP3 format.</p>
         </div>
 
       </div>
-
-      {/* Step Settings Popover */}
-      {settingsOpen && tracks[settingsOpen.trackIndex] && tracks[settingsOpen.trackIndex].steps?.[settingsOpen.stepIndex] && (
-        <StepSettings
-          step={tracks[settingsOpen.trackIndex].steps[settingsOpen.stepIndex]}
-          rect={settingsOpen.rect}
-          type={tracks[settingsOpen.trackIndex].type}
-          onUpdate={(data) => updateStep(settingsOpen.trackIndex, settingsOpen.stepIndex, data)}
-          onClose={() => setSettingsOpen(null)}
-        />
-      )}
 
       {/* Settings Modal */}
       {isSettingsOpen && (
@@ -1650,69 +1887,86 @@ export default function App() {
 
       {/* Pro Guide Modal */}
       {showProGuide && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-[#151619] border border-[#333] rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-[#151619] border-b border-[#333] p-4 flex items-center justify-between z-10">
-              <h2 className="text-xl font-bold text-[#00AAFF] flex items-center gap-2">
-                <BookOpen className="w-5 h-5" />
-                HOW TO MAKE PROFESSIONAL BEATS
-              </h2>
-              <button onClick={() => setShowProGuide(false)} className="p-2 text-[#8E9299] hover:text-white rounded-lg hover:bg-[#242424] transition-colors">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 md:p-8 backdrop-blur-xl">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-[#0a0a0c] border border-[#333] rounded-[32px] w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+          >
+            <div className="p-8 border-b border-[#333] flex items-center justify-between bg-[#151619]/50">
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 bg-[#00AAFF]/20 rounded-2xl flex items-center justify-center text-[#00AAFF]">
+                  <BookOpen size={32} />
+                </div>
+                <div>
+                  <h2 className="text-3xl font-black text-white tracking-tighter">
+                    PRO <span className="text-[#00AAFF]">STUDIO</span> GUIDE
+                  </h2>
+                  <p className="text-[#8E9299] text-xs font-bold uppercase tracking-widest mt-1">Advanced Techniques & Workflow</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowProGuide(false)} 
+                className="w-12 h-12 flex items-center justify-center bg-[#1a1b20] hover:bg-[#FF4444] text-[#8E9299] hover:text-white rounded-full transition-all border border-[#333]"
+              >
+                <X size={24} />
               </button>
             </div>
-            <div className="p-6 space-y-6 text-[#8E9299] text-sm leading-relaxed">
-              <section>
-                <h3 className="text-white font-bold text-base mb-2">1. Sound Selection is Everything</h3>
-                <p>Professional beats start with high-quality sounds. A great kick and snare will do 80% of the work. Use the new <strong>Sampler (Upload)</strong> instrument to load your own premium drum samples (.wav or .mp3) instead of relying solely on synthesized drums.</p>
-                <p className="text-[#FF4444] mt-2 text-xs"><em>Note: Custom uploaded samples are stored locally in your browser session. If you save and load a project later, you may need to re-upload your custom samples.</em></p>
-              </section>
-              
-              <section>
-                <h3 className="text-white font-bold text-base mb-2">2. The Groove (Swing & Velocity)</h3>
-                <p>Robotic beats sound amateur. To make it bounce:</p>
-                <ul className="list-disc pl-5 mt-2 space-y-1">
-                  <li><strong>Velocity:</strong> Right-click (or long-press) a step to open the Step Editor. Lower the velocity on "ghost notes" (in-between hits) and keep the main hits (like the snare on the 2 and 4) at max velocity.</li>
-                  <li><strong>Swing:</strong> Use the global Swing slider (top right) to delay every 16th note slightly. This gives the beat a human, "dilla-style" feel.</li>
-                  <li><strong>Micro-timing:</strong> In the Step Editor, use the <em>Offset</em> slider to push a snare slightly late or a hi-hat slightly early.</li>
-                </ul>
-              </section>
+            
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+              <div className="mb-12">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-1.5 h-6 bg-[#00AAFF] rounded-full" />
+                  <h3 className="text-xl font-black text-white uppercase italic tracking-tight">Interactive Modules</h3>
+                </div>
+                <LayoutGroup>
+                  <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {HELP_CARDS.map((card, idx) => (
+                      <HelpCard 
+                        key={idx}
+                        title={card.title}
+                        icon={card.icon}
+                        description={card.description}
+                        details={card.details}
+                        isExpanded={expandedHelpCard === idx}
+                        onToggle={() => setExpandedHelpCard(expandedHelpCard === idx ? null : idx)}
+                      />
+                    ))}
+                  </motion.div>
+                </LayoutGroup>
+              </div>
 
-              <section>
-                <h3 className="text-white font-bold text-base mb-2">3. Layering & Frequencies</h3>
-                <p>Don't let instruments fight for the same frequency space.</p>
-                <ul className="list-disc pl-5 mt-2 space-y-1">
-                  <li>Keep your Kick and 808/Bass in the center (Pan = 0).</li>
-                  <li>Pan your hi-hats slightly to the left or right to create width.</li>
-                  <li>Use the Track Volume to mix. The Kick and Snare should usually be the loudest elements. Turn down the hi-hats and synths so they sit <em>behind</em> the drums.</li>
-                </ul>
-              </section>
-
-              <section>
-                <h3 className="text-white font-bold text-base mb-2">4. Space & Depth (FX)</h3>
-                <p>Use the global Reverb and Delay to create a 3D space.</p>
-                <ul className="list-disc pl-5 mt-2 space-y-1">
-                  <li>Add a tiny bit of Reverb to the Snare and Clap to make them sound larger.</li>
-                  <li>Keep the Kick and Bass completely dry (0% Reverb) so they stay punchy and don't muddy the mix.</li>
-                  <li>Use Delay on melodic elements (Plucks, Pianos) to fill empty space.</li>
-                </ul>
-              </section>
-
-              <section>
-                <h3 className="text-white font-bold text-base mb-2">5. Arrangement & Variation</h3>
-                <p>A 1-bar loop gets boring quickly. Increase the <strong>BARS</strong> setting to 4 or 8. Add small variations at the end of every 4th bar (like a drum fill, an extra kick, or dropping the hi-hats out entirely) to keep the listener engaged.</p>
-              </section>
-              <section>
-                <h3 className="text-white font-bold text-base mb-2">5. New Features: 8-Bit, Looping & Auto-Stop</h3>
-                <p>Take advantage of the latest studio tools:</p>
-                <ul className="list-disc pl-5 mt-2 space-y-1">
-                  <li><strong>Chiptune & 8-Bit:</strong> Add retro video game vibes using the new 8-Bit (Square) and Chiptune (Triangle) instruments.</li>
-                  <li><strong>Looping:</strong> Toggle the <Repeat className="w-3 h-3 inline" /> Repeat button next to the Stop button to continuously loop your beat, or play it just once.</li>
-                  <li><strong>Auto-Stop Recording:</strong> Click the <Timer className="w-3 h-3 inline" /> AUTO-STOP button before recording. The studio will automatically stop recording exactly at the end of the last bar, giving you a perfect, seamless loop for export.</li>
-                </ul>
-              </section>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div className="p-8 bg-gradient-to-br from-[#1a1b20] to-[#0a0a0c] rounded-[24px] border border-[#333]">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Info className="text-[#00AAFF]" size={20} />
+                    <h4 className="font-bold text-white uppercase tracking-widest text-xs italic">Critical: Sample Storage</h4>
+                  </div>
+                  <p className="text-xs text-[#8E9299] leading-relaxed">
+                    Custom uploaded samples are stored in your <strong>browser's local session</strong>. To ensure your project sounds exactly the same on different devices, we recommend exporting your final patterns to WAV/MP3 regularly.
+                  </p>
+                </div>
+                <div className="p-8 bg-[#00AAFF]/5 rounded-[24px] border border-[#00AAFF]/20">
+                  <div className="flex items-center gap-3 mb-4 text-[#00AAFF]">
+                    <Zap size={20} fill="currentColor" />
+                    <h4 className="font-bold uppercase tracking-widest text-xs italic">Power Workflow</h4>
+                  </div>
+                  <p className="text-xs text-[#00AAFF]/70 leading-relaxed font-medium">
+                    Combine the <strong>Loop Mode</strong> with the <strong>Export Studio</strong> to build high-quality sample packs. Record your patterns live, then use the 8-Bit and SFX engines to add that professional digital crunch to your tracks.
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
+
+            <div className="p-6 bg-[#151619] border-t border-[#333] flex justify-center">
+              <button 
+                onClick={() => setShowProGuide(false)}
+                className="px-12 py-4 bg-[#00AAFF] hover:bg-[#0099ee] text-white font-black rounded-2xl shadow-lg shadow-[#00AAFF]/20 transition-all uppercase tracking-widest text-xs active:scale-95"
+              >
+                Back to Studio
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
       {promptModal && (
@@ -1736,14 +1990,6 @@ export default function App() {
       )}
       {showHelpModal && (
         <HelpModal onClose={() => setShowHelpModal(false)} />
-      )}
-      {advancedSettingsModal !== null && (
-        <AdvancedTrackModal 
-          track={tracks[advancedSettingsModal]} 
-          onUpdateTrack={(data) => updateTrack(advancedSettingsModal, data)}
-          onSampleUpload={(e) => handleSampleUpload(advancedSettingsModal, e)}
-          onClose={() => setAdvancedSettingsModal(null)} 
-        />
       )}
     </div>
   );
