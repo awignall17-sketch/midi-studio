@@ -7,14 +7,15 @@ interface Props {
   isActive: boolean;
   trackId: string;
   stepIndex: number;
+  zoom?: number;
   onToggle: (trackId: string, stepIndex: number) => void;
 }
 
-export const StepButton = React.memo(function StepButton({ isActive, color, onToggle, trackId, stepIndex }: Props) {
+export const StepButton = React.memo(function StepButton({ isActive, color, onToggle, trackId, stepIndex, zoom = 1 }: Props) {
   const [isPressing, setIsPressing] = useState(false);
 
   return (
-    <div className="relative w-8 h-10 sm:w-10 sm:h-12">
+    <div className="relative transition-all" style={{ width: `${40 * zoom}px`, height: `${48 * zoom}px` }}>
       <button
         onPointerDown={() => setIsPressing(true)}
         onPointerUp={() => setIsPressing(false)}
@@ -24,7 +25,7 @@ export const StepButton = React.memo(function StepButton({ isActive, color, onTo
           onToggle(trackId, stepIndex);
         }}
         className={clsx(
-          "absolute top-0 left-0 w-full h-10 sm:h-12 rounded-md transition-all duration-100 border-2 touch-none step-btn overflow-hidden flex items-center justify-center",
+          "absolute top-0 left-0 w-full h-full rounded-md transition-all duration-100 border-2 touch-none step-btn overflow-hidden flex items-center justify-center",
           isActive ? "border-transparent" : "border-[#333]",
           isPressing && "scale-95"
         )}

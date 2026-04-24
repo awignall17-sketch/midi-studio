@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, ChevronUp, ChevronDown, Trash2, Copy, Eraser, ArrowRight, ArrowLeft, Upload, Shuffle, Wand2, Save, Minimize2, Maximize2, Sliders } from 'lucide-react';
+import { Volume2, VolumeX, ChevronUp, ChevronDown, Trash2, Copy, Eraser, ArrowRight, ArrowLeft, Upload, Shuffle, Wand2, Save, Minimize2, Maximize2, Sliders, ChevronRight } from 'lucide-react';
 import { TrackData } from '../types';
 import { StepButton } from './StepButton';
 
@@ -25,6 +25,7 @@ interface Props {
   onToggleStep: (trackId: string, stepIndex: number) => void;
   onOpenSettings: (trackId: string, stepIndex: number, rect: DOMRect) => void;
   onOpenAdvanced: (trackIndex: number) => void;
+  zoom?: number;
 }
 
 export const TrackRow = React.memo(function TrackRow({
@@ -49,6 +50,7 @@ export const TrackRow = React.memo(function TrackRow({
   onToggleStep,
   onOpenSettings,
   onOpenAdvanced,
+  zoom = 1,
 }: Props) {
   return (
     <div className={`flex border-b border-[#2a2b30] last:border-0 relative ${track.minimized ? 'h-10 sm:h-12' : ''}`}>
@@ -72,8 +74,8 @@ export const TrackRow = React.memo(function TrackRow({
             />
           </div>
           <div className="flex gap-0.5">
-            <button onClick={() => onUpdateTrack(trackIndex, { minimized: !track.minimized })} className="p-1 rounded text-[#8E9299] hover:text-white transition-colors" title="Minimize/Maximize Track">
-              {track.minimized ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
+            <button onClick={() => onUpdateTrack(trackIndex, { minimized: !track.minimized })} className="p-1 rounded text-[#8E9299] hover:text-white transition-colors" title="Toggle Track Collapse">
+              {track.minimized ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
             <button onClick={() => onToggleMute(trackIndex)} className={`p-1 rounded ${track.muted ? 'text-[#FF4444]' : 'text-[#8E9299] hover:text-white'}`} title="Mute">
               {track.muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
@@ -199,9 +201,6 @@ export const TrackRow = React.memo(function TrackRow({
             </button>
             <button onClick={() => onRandomizeTrack(trackIndex)} className="p-1 text-[#8E9299] hover:text-white" title="Randomize Steps">
               <Shuffle className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={() => onHumanizeTrack(trackIndex)} className="p-1 text-[#8E9299] hover:text-white" title="Humanize Timing/Velocity">
-              <Wand2 className="w-3.5 h-3.5" />
             </button>
             <button onClick={() => onClearTrack(trackIndex)} className="p-1 text-[#8E9299] hover:text-[#FF4444]" title="Clear Track">
               <Eraser className="w-3.5 h-3.5" />
@@ -450,8 +449,8 @@ export const TrackRow = React.memo(function TrackRow({
                       color={track.color}
                       isActive={step.active}
                       onToggle={onToggleStep}
+                      zoom={zoom}
                     />
-                    <div className="playhead-indicator absolute -top-3 -bottom-[13px] sm:-top-4 sm:-bottom-[17px] left-1/2 -translate-x-1/2 w-0.5 bg-[#FF4444] opacity-80 z-10 pointer-events-none shadow-[0_0_8px_#FF4444]" />
                   </>
                 )}
               </div>

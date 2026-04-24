@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, X, Music, SlidersHorizontal, MousePointerClick, AudioWaveform, Clock, Headphones, ArrowLeft, BookOpen, ChevronRight, HelpCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, X, Music, SlidersHorizontal, MousePointerClick, AudioWaveform, Clock, Headphones, ArrowLeft, BookOpen, ChevronRight, HelpCircle, Layers, Settings2, Globe, ThumbsDown, ThumbsUp } from 'lucide-react';
 
 interface Props {
   onClose: () => void;
@@ -8,6 +8,11 @@ interface Props {
 export function HelpModal({ onClose }: Props) {
   const [searchWord, setSearchWord] = useState('');
   const [selectedTopic, setSelectedTopic] = useState<number | null>(null);
+  const [helpfulStatus, setHelpfulStatus] = useState<'none' | 'yes' | 'no'>('none');
+
+  useEffect(() => {
+    setHelpfulStatus('none');
+  }, [selectedTopic]);
 
   const helpTopics = [
     {
@@ -46,6 +51,20 @@ export function HelpModal({ onClose }: Props) {
       content: `• The bottom strip contains global Master Effects affecting your whole song.\n\n### Master Chain\n• **COMP THR & RATIO**: This controls compression. It makes quiet sounds louder and loud sounds smoother, giving your track that commercial "glue".\n• **ECHO (Delay) & VERB (Reverb)**: Adds 3D space and bounce to your overall track. Use sparingly to avoid a muddy mix.\n• **EQ (Low, Mid, High)**: Shape the frequency balance. Boost the lows for more bass, or cut highs to reduce harshness.`
     },
     {
+      title: 'Track Operations',
+      icon: <Layers className="w-6 h-6 text-[#FFCC00]" />,
+      tags: ['track', 'delete', 'clear', 'mute', 'solo', 'duplicate'],
+      description: 'Manage your instruments with track-level controls.',
+      content: `Each track has several controls on the left side to help you write and arrange:\n\n• **Trash Can**: Completely removes the track from the project.\n• **Eraser**: Clears all active beats from the track, but keeps the track and its settings.\n• **Copy**: Duplicates the pattern from the track.\n• **Eye / Dropdown Arrow**: Minimize or maximize the track to save screen real-estate.\n• **Speaker**: Mutes or unmutes the track during playback.`
+    },
+    {
+      title: 'Tempo & Groove (BPM / Swing)',
+      icon: <Settings2 className="w-6 h-6 text-[#00FFFF]" />,
+      tags: ['tempo', 'bpm', 'speed', 'swing', 'groove', 'shuffle'],
+      description: 'Control the speed and feel of your master composition.',
+      content: `• **BPM (Beats Per Minute)**: Sets the speed of playback. Higher is faster. Hip-hop usually sits around 80-100 BPM, House at 120-130 BPM, and Drum & Bass at 170+ BPM.\n• **SWING**: Adds a rhythmic 'skip' or shuffle to your beats. At 0%, robots play your drums. At 50%, they have a slight hip-hop bounce. At 100%, it's fully swung.`
+    },
+    {
       title: 'SFX Studio (Sound Design)',
       icon: <Music className="w-6 h-6 text-[#ff8800]" />,
       tags: ['sfx', 'synth', 'design', 'generator', 'laser', 'explosion', 'coin'],
@@ -58,6 +77,20 @@ export function HelpModal({ onClose }: Props) {
       tags: ['performance', 'lag', 'speed', 'slow', 'animation'],
       description: 'Disable visual flair to prioritize audio stability on older devices.',
       content: `• If you experience audio crackling or visual lag, enable PERFORMANCE MODE in the settings.\n• This disables complex CSS animations and playhead trackers, freeing up CPU overhead for the audio engine.\n• Highly recommended for projects with more than 12 tracks.`
+    },
+    {
+      title: 'Importing & Saving Projects',
+      icon: <BookOpen className="w-6 h-6 text-[#00FFFF]" />,
+      tags: ['save', 'load', 'json', 'export', 'backup', 'project'],
+      description: 'Never lose a beat. Learn how to save your creations to your computer and load them back later.',
+      content: `• Click **SAVE PROJECT** in the top navigation to download a .json file containing your entire session (pattern data, tempo, synth settings, and FX).\n• Use **LOAD PROJECT** to open past sessions.\n• Note: Custom audio samples uploaded into Sampler tracks are NOT saved inside the JSON file to keep files small. You must upload the audio files again when you reload the project.`
+    },
+    {
+      title: 'Keyboard Shortcuts',
+      icon: <HelpCircle className="w-6 h-6 text-[#FF00AA]" />,
+      tags: ['keyboard', 'shortcuts', 'hotkeys', 'play', 'stop'],
+      description: 'Speed up your workflow using the computer keyboard.',
+      content: `• **Spacebar**: Play / Pause the main transport.\n• **Shift + Space**: Stop and reset playback to the beginning.\n• Keep an eye out for tooltips on buttons, as we're always adding more shortcut actions to common interfaces.`
     }
   ];
 
@@ -141,7 +174,7 @@ export function HelpModal({ onClose }: Props) {
                       <button 
                         key={i} 
                         onClick={() => setSelectedTopic(i)}
-                        className="bg-[#151619] border border-[#333] rounded-3xl p-8 text-left hover:border-[#00AAFF] hover:bg-[#1a1b20] transition-all group relative overflow-hidden"
+                        className="bg-[#151619] border border-[#333] rounded-3xl p-8 text-left hover:border-[#00AAFF] hover:bg-[#1a1b20] transition-all group relative overflow-hidden flex flex-col h-full"
                       >
                         <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-20 transition-opacity">
                           {topic.icon}
@@ -150,7 +183,7 @@ export function HelpModal({ onClose }: Props) {
                           {topic.icon}
                         </div>
                         <h3 className="text-xl font-black text-white mb-3 uppercase tracking-tight group-hover:text-[#00AAFF] transition-colors">{topic.title}</h3>
-                        <p className="text-sm text-[#8E9299] leading-relaxed font-bold border-l-2 border-[#333] pl-4">
+                        <p className="text-sm text-[#8E9299] leading-relaxed font-bold border-l-2 border-[#333] pl-4 flex-1">
                           {topic.description}
                         </p>
                       </button>
@@ -180,14 +213,20 @@ export function HelpModal({ onClose }: Props) {
               <div className="prose prose-invert prose-lg max-w-none">
                  <div className="text-white whitespace-pre-line text-lg leading-relaxed font-medium bg-[#151619] border border-[#333] p-12 rounded-[40px] shadow-2xl">
                     {helpTopics[selectedTopic].content}
-                 </div>
-              </div>
-
-              <div className="mt-20 border-t border-[#333] pt-12 flex items-center justify-between">
-                 <p className="text-sm font-bold text-[#8E9299]">Was this article helpful?</p>
-                 <div className="flex gap-4">
-                    <button className="px-8 py-3 bg-[#151619] border border-[#333] rounded-2xl text-xs font-black hover:border-[#00AAFF] transition-all uppercase">Yes, thanks!</button>
-                    <button className="px-8 py-3 bg-[#151619] border border-[#333] rounded-2xl text-xs font-black hover:border-[#FF4444] transition-all uppercase">Need more help</button>
+                    
+                    <div className="mt-12 border-t border-[#333] pt-12 flex flex-col sm:flex-row items-center justify-between gap-6">
+                      <div className="text-xl font-black text-white">Was this article helpful?</div>
+                      {helpfulStatus === 'none' ? (
+                        <div className="flex gap-4 w-full sm:w-auto">
+                          <button onClick={() => setHelpfulStatus('yes')} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-8 py-3 rounded-2xl bg-[#242424] hover:bg-[#2A2B30] hover:text-[#00AAFF] hover:border-[#00AAFF]/50 text-white font-bold border border-[#333] transition-colors"><ThumbsUp size={20} /> Yes</button>
+                          <button onClick={() => setHelpfulStatus('no')} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-8 py-3 rounded-2xl bg-[#242424] hover:bg-[#2A2B30] hover:text-[#FF4444] hover:border-[#FF4444]/50 text-white font-bold border border-[#333] transition-colors"><ThumbsDown size={20} /> No</button>
+                        </div>
+                      ) : (
+                        <div className="text-[#00AAFF] font-black text-lg bg-[#00AAFF]/10 px-6 py-3 rounded-2xl border border-[#00AAFF]/30 animate-in fade-in zoom-in duration-300">
+                          {helpfulStatus === 'yes' ? 'Thanks for your feedback!' : 'Thanks, we will improve this.'}
+                        </div>
+                      )}
+                    </div>
                  </div>
               </div>
             </div>

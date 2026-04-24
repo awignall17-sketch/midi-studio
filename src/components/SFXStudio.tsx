@@ -556,30 +556,114 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
       const duration = type === 'sound' ? (attack + decay + release + 1) : (16 * Tone.Time("16n").toSeconds() + 1);
       
       const buffer = await Tone.Offline(async () => {
-        // Essential: use a local destination
-        const dest = Tone.Destination;
+        // Setup effect chain exactly like live
+        const comp = new Tone.Compressor(compThreshold, compRatio).toDestination();
+        const eq = new Tone.EQ3(eqLow, eqMid, eqHigh).connect(comp);
+        const filter = new Tone.Filter(filterFreq, "lowpass").connect(eq);
+        filter.Q.value = filterRes;
+        const reverb = new Tone.Reverb({ decay: 2, wet: fxReverb }).connect(filter);
+        const delay = new Tone.FeedbackDelay("8n", 0.5).connect(reverb);
+        delay.wet.value = fxDelay;
+        const dist = new Tone.Distortion({ distortion: 0.8, wet: fxDist }).connect(delay);
+        const bitcrusher = new Tone.BitCrusher(4).connect(dist);
+        bitcrusher.wet.value = fxBitcrush;
+        const chorus = new Tone.Chorus(4, 2.5, 0.5).start().connect(bitcrusher);
+        chorus.wet.value = fxChorus;
+        const phaser = new Tone.Phaser({ frequency: 15, octaves: 5, baseFrequency: 1000 }).connect(chorus);
+        phaser.wet.value = fxPhaser;
+        const autoFilter = new Tone.AutoFilter("4n").start().connect(phaser);
+        autoFilter.wet.value = fxAutoFilter;
+        const tremolo = new Tone.Tremolo(fxTremoloFreq, 0).start().connect(autoFilter);
+        tremolo.wet.value = fxTremoloDepth;
+        const pitchShift = new Tone.PitchShift(fxPitchShift).connect(tremolo);
+        const vibrato = new Tone.Vibrato(vibratoFreq, 0).connect(pitchShift);
+        vibrato.depth.value = vibratoDepth;
         
-        // Setup simple synths
-        const main = new Tone.Synth({
-          oscillator: { type: oscType as any },
-          envelope: { attack, decay, sustain, release }
-        }).toDestination();
-        
+        const buildSynth = (sType: string, oType: string, a: number, d: number, s: number, r: number) => {
+          let temp: any;
+          if (sType === 'membrane') temp = new Tone.MembraneSynth({ oscillator: { type: oType as any }, envelope: { attack: a, decay: d, sustain: s, release: r } }).connect(vibrato);
+          else if (sType === 'metal') temp = new Tone.MetalSynth({ envelope: { attack: a, decay: d, release: r } }).connect(vibrato);
+          else if (sType === 'fm') temp = new Tone.FMSynth({ oscillator: { type: oType as any }, envelope: { attack: a, decay: d, sustain: s, release: r } }).connect(vibrato);
+          else if (sType === 'am') temp = new Tone.AMSynth({ oscillator: { type: oType as any }, envelope: { attack: a, decay: d, sustain: s, release: r } }).connect(vibrato);
+          else temp = new Tone.Synth({ oscillator: { type: oType as any }, envelope: { attack: a, decay: d, sustain: s, release: r } }).connect(vibrato);
+          return temp;
+        };
+
         if (type === 'sound') {
+          const main = buildSynth(synthType, oscType, attack, decay, sustain, release);
           main.triggerAttackRelease(pitch, release, 0);
+          
+          if (pitchSweep === 'up') {
+            const freq = main.toFrequency(pitch);
+            main.frequency?.setValueAtTime(freq, 0);
+            main.frequency?.exponentialRampToValueAtTime(freq * 3, sweepTime);
+          } else if (pitchSweep === 'down') {
+            const freq = main.toFrequency(pitch);
+            main.frequency?.setValueAtTime(freq, 0);
+            main.frequency?.exponentialRampToValueAtTime(freq * 0.1, sweepTime);
+          }
+
+          if (noiseMix > 0) {
+            const noise = new Tone.NoiseSynth({ noise: { type: noiseType as any }, volume: Tone.gainToDb(noiseMix) }).connect(vibrato);
+            noise.triggerAttackRelease('8n', 0);
+          }
+          if (subMix > 0) {
+            const sub = new Tone.MembraneSynth({ volume: Tone.gainToDb(subMix) }).connect(vibrato);
+            sub.triggerAttackRelease('C1', '8n', 0);
+          }
         } else {
           sequence.forEach((step, i) => {
             if (step.active) {
               const time = i * Tone.Time("16n").toSeconds();
               const s = step.lockedState;
+              
               if (s) {
-                const temp = new Tone.Synth({
-                  oscillator: { type: s.oscType as any },
-                  envelope: { attack: s.attack, decay: s.decay, sustain: s.sustain, release: s.release }
-                }).toDestination();
-                temp.triggerAttackRelease(s.pitch, s.release, time);
+                 const stepTremolo = new Tone.Tremolo(fxTremoloFreq, 0).start().connect(autoFilter);
+                 stepTremolo.wet.value = fxTremoloDepth;
+                 const stepPitchShift = new Tone.PitchShift(s.fxParams?.fxDist ? 0 : s.fxParams?.fxDelay ? 0 : fxPitchShift).connect(stepTremolo);
+                 const stepVibrato = new Tone.Vibrato(vibratoFreq, 0).connect(stepPitchShift);
+                 stepVibrato.depth.value = vibratoDepth;
+                 // It gets very complex replicating unique FX for each step offline
+                 // So we'll just connect to the main vibrato chain but update the freq and pitch
+                 const temp = buildSynth(s.synthType, s.oscType, s.attack, s.decay, s.sustain, s.release);
+                 temp.triggerAttackRelease(s.pitch, s.release, time);
+                 if (s.pitchSweep === 'up') {
+                    const freq = temp.toFrequency(s.pitch);
+                    temp.frequency?.setValueAtTime(freq, time);
+                    temp.frequency?.exponentialRampToValueAtTime(freq * 3, time + s.sweepTime);
+                  } else if (s.pitchSweep === 'down') {
+                    const freq = temp.toFrequency(s.pitch);
+                    temp.frequency?.setValueAtTime(freq, time);
+                    temp.frequency?.exponentialRampToValueAtTime(freq * 0.1, time + s.sweepTime);
+                  }
+                 if (s.noiseMix > 0) {
+                    const noise = new Tone.NoiseSynth({ noise: { type: s.noiseType as any }, volume: Tone.gainToDb(s.noiseMix) }).connect(vibrato);
+                    noise.triggerAttackRelease('8n', time);
+                  }
+                  if (s.subMix > 0) {
+                    const sub = new Tone.MembraneSynth({ volume: Tone.gainToDb(s.subMix) }).connect(vibrato);
+                    sub.triggerAttackRelease('C1', '8n', time);
+                  }
               } else {
+                const main = buildSynth(synthType, oscType, attack, decay, sustain, release);
                 main.triggerAttackRelease(pitch, release, time);
+                if (pitchSweep === 'up') {
+                  const freq = main.toFrequency(pitch);
+                  main.frequency?.setValueAtTime(freq, time);
+                  main.frequency?.exponentialRampToValueAtTime(freq * 3, time + sweepTime);
+                } else if (pitchSweep === 'down') {
+                  const freq = main.toFrequency(pitch);
+                  main.frequency?.setValueAtTime(freq, time);
+                  main.frequency?.exponentialRampToValueAtTime(freq * 0.1, time + sweepTime);
+                }
+                if (noiseMix > 0) {
+                  const noise = new Tone.NoiseSynth({ noise: { type: noiseType as any }, volume: Tone.gainToDb(noiseMix) }).connect(vibrato);
+                  noise.triggerAttackRelease('8n', time);
+                }
+                if (subMix > 0) {
+                  const sub = new Tone.MembraneSynth({ volume: Tone.gainToDb(subMix) }).connect(vibrato);
+                  sub.triggerAttackRelease('C1', '8n', time);
+                }
               }
             }
           });
@@ -601,19 +685,61 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
     try {
       const duration = (attack + decay + release + 0.5);
       const buffer = await Tone.Offline(async () => {
-        const osc = new Tone.Synth({
-          oscillator: { type: oscType as any },
-          envelope: { attack, decay, sustain, release }
-        }).toDestination();
+        const comp = new Tone.Compressor(compThreshold, compRatio).toDestination();
+        const eq = new Tone.EQ3(eqLow, eqMid, eqHigh).connect(comp);
+        const filter = new Tone.Filter(filterFreq, "lowpass").connect(eq);
+        filter.Q.value = filterRes;
+        const reverb = new Tone.Reverb({ decay: 2, wet: fxReverb }).connect(filter);
+        const delay = new Tone.FeedbackDelay("8n", 0.5).connect(reverb);
+        delay.wet.value = fxDelay;
+        const dist = new Tone.Distortion({ distortion: 0.8, wet: fxDist }).connect(delay);
+        const bitcrusher = new Tone.BitCrusher(4).connect(dist);
+        bitcrusher.wet.value = fxBitcrush;
+        const chorus = new Tone.Chorus(4, 2.5, 0.5).start().connect(bitcrusher);
+        chorus.wet.value = fxChorus;
+        const phaser = new Tone.Phaser({ frequency: 15, octaves: 5, baseFrequency: 1000 }).connect(chorus);
+        phaser.wet.value = fxPhaser;
+        const autoFilter = new Tone.AutoFilter("4n").start().connect(phaser);
+        autoFilter.wet.value = fxAutoFilter;
+        const tremolo = new Tone.Tremolo(fxTremoloFreq, 0).start().connect(autoFilter);
+        tremolo.wet.value = fxTremoloDepth;
+        const pitchShift = new Tone.PitchShift(fxPitchShift).connect(tremolo);
+        const vibrato = new Tone.Vibrato(vibratoFreq, 0).connect(pitchShift);
+        vibrato.depth.value = vibratoDepth;
+        
+        const buildSynth = (sType: string, oType: string, a: number, d: number, s: number, r: number) => {
+          let temp: any;
+          if (sType === 'membrane') temp = new Tone.MembraneSynth({ oscillator: { type: oType as any }, envelope: { attack: a, decay: d, sustain: s, release: r } }).connect(vibrato);
+          else if (sType === 'metal') temp = new Tone.MetalSynth({ envelope: { attack: a, decay: d, release: r } }).connect(vibrato);
+          else if (sType === 'fm') temp = new Tone.FMSynth({ oscillator: { type: oType as any }, envelope: { attack: a, decay: d, sustain: s, release: r } }).connect(vibrato);
+          else if (sType === 'am') temp = new Tone.AMSynth({ oscillator: { type: oType as any }, envelope: { attack: a, decay: d, sustain: s, release: r } }).connect(vibrato);
+          else temp = new Tone.Synth({ oscillator: { type: oType as any }, envelope: { attack: a, decay: d, sustain: s, release: r } }).connect(vibrato);
+          return temp;
+        };
+
+        const osc = buildSynth(synthType, oscType, attack, decay, sustain, release);
         osc.triggerAttackRelease(pitch, release, 0);
         
+        if (pitchSweep === 'up') {
+          const freq = osc.toFrequency(pitch);
+          osc.frequency?.setValueAtTime(freq, 0);
+          osc.frequency?.exponentialRampToValueAtTime(freq * 3, sweepTime);
+        } else if (pitchSweep === 'down') {
+          const freq = osc.toFrequency(pitch);
+          osc.frequency?.setValueAtTime(freq, 0);
+          osc.frequency?.exponentialRampToValueAtTime(freq * 0.1, sweepTime);
+        }
+
         if (noiseMix > 0) {
           const noise = new Tone.NoiseSynth({
             noise: { type: noiseType as any },
-            envelope: { attack, decay, sustain, release },
             volume: Tone.gainToDb(noiseMix)
-          }).toDestination();
-          noise.triggerAttackRelease(release, 0);
+          }).connect(vibrato);
+          noise.triggerAttackRelease('8n', 0);
+        }
+        if (subMix > 0) {
+          const sub = new Tone.MembraneSynth({ volume: Tone.gainToDb(subMix) }).connect(vibrato);
+          sub.triggerAttackRelease('C1', '8n', 0);
         }
       }, duration);
 
@@ -953,51 +1079,92 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
         </section>
 
         <div className={`rounded-2xl border overflow-hidden shadow-2xl transition-all ${lightMode ? 'bg-white border-gray-200' : 'bg-[#1a1b20] border-[#333]'}`}>
-          <div className={`flex border-b transition-all ${lightMode ? 'bg-gray-50 border-gray-200' : 'bg-[#242424] border-[#333]'}`}>
-            {['generator', 'envelope', 'effects', 'layers'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex-1 py-4 text-[10px] font-black transition-all ${activeTab === tab ? `bg-transparent text-[#00AAFF] border-b-2 border-[#00AAFF]` : `${lightMode ? 'text-gray-400' : 'text-[#8E9299]'} hover:bg-black/5`}`}>{tab.toUpperCase()}</button>
-            ))}
+          <div className={`p-4 border-b transition-all flex items-center justify-between ${lightMode ? 'bg-gray-50 border-gray-200' : 'bg-[#242424] border-[#333]'}`}>
+            <h3 className="text-xs font-black tracking-widest text-[#8E9299]">SYNTHESIZER PARAMETERS</h3>
+            <div className="flex bg-[#151619] rounded-lg p-1 border border-[#333]">
+              {[
+                { id: 'generator', label: 'GEN / OSC', color: '#00AAFF' },
+                { id: 'envelope', label: 'ENVELOPE', color: '#FF4444' },
+                { id: 'effects', label: 'FX CHAIN', color: '#FF8800' },
+                { id: 'layers', label: 'LAYERS', color: '#AA00FF' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`px-4 py-1.5 text-[9px] font-black uppercase rounded-md transition-all ${activeTab === tab.id ? 'bg-[#2A2B30] text-white shadow-md' : 'text-[#8E9299] hover:text-white hover:bg-[#2A2B30]/50'}`}
+                  style={activeTab === tab.id ? { color: tab.color } : {}}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="p-8">
+            
+            {/* GENERATOR */}
             {activeTab === 'generator' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-[10px] font-black text-[#8E9299] uppercase tracking-widest mb-3">Engine</label>
+              <div className="animate-in fade-in zoom-in-95 duration-200">
+                <h4 className="text-[10px] font-black uppercase text-[#00AAFF] mb-4 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-[#00AAFF]"></div>Generator Engine</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  <div className="space-y-4">
                     <select value={synthType} onChange={e => setSynthType(e.target.value)} className={`w-full border rounded-xl p-4 text-xs font-bold appearance-none cursor-pointer transition-all ${lightMode ? 'bg-gray-50 border-gray-200 text-black' : 'bg-[#1a1b20] border-[#333] text-white'}`}><option value="synth">Basic</option><option value="fm">FM (Metal)</option><option value="am">AM (Buzzy)</option><option value="membrane">Membrane (Drum)</option><option value="metal">Cymbal</option></select>
                   </div>
                   {synthType !== 'noise' && (
                     <div className="grid grid-cols-2 gap-2">
-                    {['sine', 'square', 'triangle', 'sawtooth'].map(shape => (<button key={shape} onClick={() => setOscType(shape)} className={`py-3 rounded-lg text-[10px] font-black uppercase border transition-all ${oscType === shape ? 'bg-[#00AAFF] border-[#00AAFF] text-white' : (lightMode ? 'bg-gray-50 border-gray-200 text-gray-500' : 'bg-[#1a1b20] border-[#333] text-white')}`}>{shape}</button>))}
+                    {['sine', 'square', 'triangle', 'sawtooth'].map(shape => (<button key={shape} onClick={() => setOscType(shape)} className={`py-4 rounded-lg text-[10px] font-black uppercase border transition-all ${oscType === shape ? 'bg-[#00AAFF] border-[#00AAFF] text-white' : (lightMode ? 'bg-gray-50 border-gray-200 text-gray-500' : 'bg-[#1a1b20] border-[#333] text-white hover:bg-[#242424]')}`}>{shape}</button>))}
                     </div>
                   )}
-                </div>
-                <div className="space-y-6">
-                  <div><label className="block text-[10px] font-black text-[#8E9299] uppercase tracking-widest mb-3">Pitch</label><input type="text" value={pitch} onChange={e => setPitch(e.target.value)} className={`w-full border rounded-xl p-4 text-center font-black transition-all ${lightMode ? 'bg-gray-50 border-gray-200 text-[#00AAFF]' : 'bg-[#1a1b20] border-[#333] text-[#00AAFF]'}`} /></div>
-                  <div className="flex gap-2">{['up', 'none', 'down'].map(s => (<button key={s} onClick={() => setPitchSweep(s as any)} className={`flex-1 py-2 rounded-lg text-[10px] font-black border transition-all ${pitchSweep === s ? 'bg-[#AA00FF] border-[#AA00FF] text-white' : (lightMode ? 'bg-gray-50 border-gray-200 text-gray-400' : 'border-[#333] text-[#8E9299]')}`}>{s.toUpperCase()}</button>))}</div>
+                  <div className="space-y-4">
+                    <div className="flex gap-2">
+                      <input type="text" value={pitch} onChange={e => setPitch(e.target.value)} className={`w-24 border rounded-xl p-4 text-center font-black transition-all ${lightMode ? 'bg-gray-50 border-gray-200 text-[#00AAFF]' : 'bg-[#1a1b20] border-[#333] text-[#00AAFF]'}`} />
+                      <div className="flex-1 flex gap-2">{['up', 'none', 'down'].map(s => (<button key={s} onClick={() => setPitchSweep(s as any)} className={`flex-1 rounded-lg text-[10px] font-black border transition-all ${pitchSweep === s ? 'bg-[#00AAFF] border-[#00AAFF] text-white' : (lightMode ? 'bg-gray-50 border-gray-200 text-gray-400' : 'border-[#333] text-[#8E9299] hover:bg-[#242424]')}`}>{s.toUpperCase()}</button>))}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
+
+            {/* ENVELOPE */}
             {activeTab === 'envelope' && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                {[ { label: 'A', val: attack, set: setAttack, max: 2 }, { label: 'D', val: decay, set: setDecay, max: 2 }, { label: 'S', val: sustain, set: setSustain, max: 1 }, { label: 'R', val: release, set: setRelease, max: 5 } ].map(p => (
-                  <div key={p.label} className="space-y-3"><div className={`flex justify-between text-[10px] font-black ${lightMode ? 'text-gray-500' : ''}`}><span>{p.label}</span><span>{p.val.toFixed(2)}s</span></div><input type="range" min="0.001" max={p.max} step="0.01" value={p.val} onChange={e => p.set(parseFloat(e.target.value))} className="w-full custom-slider" /></div>
-                ))}
+              <div className="animate-in fade-in zoom-in-95 duration-200">
+                <h4 className="text-[10px] font-black uppercase text-[#FF4444] mb-4 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-[#FF4444]"></div>Envelope</h4>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                  {[ { label: 'ATTACK', val: attack, set: setAttack, max: 2 }, { label: 'DECAY', val: decay, set: setDecay, max: 2 }, { label: 'SUSTAIN', val: sustain, set: setSustain, max: 1 }, { label: 'RELEASE', val: release, set: setRelease, max: 5 } ].map(p => (
+                    <div key={p.label} className={`p-4 rounded-xl border space-y-4 ${lightMode ? 'bg-gray-50 border-gray-200' : 'bg-black/20 border-[#333]'}`}>
+                      <div className={`flex justify-between text-[10px] font-black tracking-widest ${lightMode ? 'text-gray-500' : 'text-[#8E9299]'}`}><span>{p.label}</span><span className={lightMode ? 'text-black' : 'text-white'}>{p.val.toFixed(2)}s</span></div>
+                      <input type="range" min="0.001" max={p.max} step="0.01" value={p.val} onChange={e => p.set(parseFloat(e.target.value))} className="w-full custom-slider slider-red" />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
+
+            {/* EFFECTS */}
             {activeTab === 'effects' && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                {[ { label: 'FILTER', val: filterFreq, set: setFilterFreq, min: 20, max: 20000 }, { label: 'DISTORT', val: fxDist, set: setFxDist, min: 0, max: 1 }, { label: 'REVERB', val: fxReverb, set: setFxReverb, min: 0, max: 1 }, { label: 'DELAY', val: fxDelay, set: setFxDelay, min: 0, max: 1 } ].map(p => (
-                  <div key={p.label} className="space-y-3"><div className={`flex justify-between text-[10px] font-black ${lightMode ? 'text-gray-500' : ''}`}><span>{p.label}</span></div><input type="range" min={p.min} max={p.max} step="0.01" value={p.val} onChange={e => p.set(parseFloat(e.target.value))} className="w-full custom-slider" /></div>
-                ))}
+              <div className="animate-in fade-in zoom-in-95 duration-200">
+                <h4 className="text-[10px] font-black uppercase text-[#FF8800] mb-4 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-[#FF8800]"></div>Effect Chain</h4>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                  {[ { label: 'FILTER FREQ', val: filterFreq, set: setFilterFreq, min: 20, max: 20000 }, { label: 'DISTORTION', val: fxDist, set: setFxDist, min: 0, max: 1 }, { label: 'REVERB WET', val: fxReverb, set: setFxReverb, min: 0, max: 1 }, { label: 'DELAY WET', val: fxDelay, set: setFxDelay, min: 0, max: 1 } ].map(p => (
+                    <div key={p.label} className={`p-4 rounded-xl border space-y-4 ${lightMode ? 'bg-gray-50 border-gray-200' : 'bg-black/20 border-[#333]'}`}>
+                      <div className={`flex justify-between text-[10px] font-black tracking-widest ${lightMode ? 'text-gray-500' : 'text-[#8E9299]'}`}><span>{p.label}</span></div>
+                      <input type="range" min={p.min} max={p.max} step="0.01" value={p.val} onChange={e => p.set(parseFloat(e.target.value))} className="w-full custom-slider slider-yellow" />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
+
+            {/* LAYERS */}
             {activeTab === 'layers' && (
-              <div className="grid grid-cols-2 gap-8">
-                <div className="space-y-4"><label className="text-[10px] font-black uppercase text-[#8E9299]">Noise Layer</label><input type="range" min="0" max="1" step="0.01" value={noiseMix} onChange={e => setNoiseMix(parseFloat(e.target.value))} className="w-full custom-slider" /></div>
-                <div className="space-y-4"><label className="text-[10px] font-black uppercase text-[#8E9299]">Sub Layer</label><input type="range" min="0" max="1" step="0.01" value={subMix} onChange={e => setSubMix(parseFloat(e.target.value))} className="w-full custom-slider" /></div>
+              <div className="animate-in fade-in zoom-in-95 duration-200">
+                <h4 className="text-[10px] font-black uppercase text-[#AA00FF] mb-4 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-[#AA00FF]"></div>Sub / Noise Layers</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className={`p-4 rounded-xl border space-y-4 ${lightMode ? 'bg-gray-50 border-gray-200' : 'bg-black/20 border-[#333]'}`}><label className={`text-[10px] font-black uppercase tracking-widest ${lightMode ? 'text-gray-500' : 'text-[#8E9299]'}`}>Noise Mix</label><input type="range" min="0" max="1" step="0.01" value={noiseMix} onChange={e => setNoiseMix(parseFloat(e.target.value))} className="w-full custom-slider slider-purple" /></div>
+                  <div className={`p-4 rounded-xl border space-y-4 ${lightMode ? 'bg-gray-50 border-gray-200' : 'bg-black/20 border-[#333]'}`}><label className={`text-[10px] font-black uppercase tracking-widest ${lightMode ? 'text-gray-500' : 'text-[#8E9299]'}`}>Sub Bass Mix</label><input type="range" min="0" max="1" step="0.01" value={subMix} onChange={e => setSubMix(parseFloat(e.target.value))} className="w-full custom-slider slider-purple" /></div>
+                </div>
               </div>
             )}
+            
           </div>
         </div>
       </div>

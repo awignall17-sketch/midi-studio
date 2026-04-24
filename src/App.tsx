@@ -17,20 +17,14 @@ import { HelpModal } from './components/HelpModal';
 const createEmptySteps = (length: number, defaultNote: string) => 
   Array.from({ length }, () => ({ active: false, note: defaultNote, velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 }));
 
-const PlaybackTracker = ({ performanceMode }: { performanceMode: boolean }) => {
+const TimeDisplay = ({ bars, bpm, performanceMode }: { bars: number, bpm: number, performanceMode: boolean }) => {
   const [time, setTime] = useState(0);
-  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     let animationFrame: number;
     const updateTime = () => {
-      setTime(Tone.Transport.seconds);
-      if (Tone.Transport.state === 'started') {
-        const totalDuration = Tone.Transport.loopEnd as number;
-        setProgress((Tone.Transport.seconds % totalDuration) / totalDuration);
-      } else {
-        setProgress(0);
-      }
+      // Use Transport position to respect looping
+      setTime(Tone.Transport.state === 'started' ? Tone.Time(Tone.Transport.position as any).toSeconds() : 0);
       if (!performanceMode) {
         animationFrame = requestAnimationFrame(updateTime);
       }
@@ -38,14 +32,8 @@ const PlaybackTracker = ({ performanceMode }: { performanceMode: boolean }) => {
 
     if (performanceMode) {
       const interval = setInterval(() => {
-        setTime(Tone.Transport.seconds);
-        if (Tone.Transport.state === 'started') {
-          const totalDuration = Tone.Transport.loopEnd as number;
-          setProgress((Tone.Transport.seconds % totalDuration) / totalDuration);
-        } else {
-          setProgress(0);
-        }
-      }, 500); // Only update twice a second in performance mode
+        setTime(Tone.Transport.state === 'started' ? Tone.Time(Tone.Transport.position as any).toSeconds() : 0);
+      }, 500);
       return () => clearInterval(interval);
     }
 
@@ -53,29 +41,18 @@ const PlaybackTracker = ({ performanceMode }: { performanceMode: boolean }) => {
     return () => cancelAnimationFrame(animationFrame);
   }, [performanceMode]);
 
-  const d = new Date(time * 1000);
-  const m = d.getUTCMinutes().toString().padStart(2, '0');
-  const s = d.getUTCSeconds().toString().padStart(2, '0');
+  const mCurrent = Math.floor(time / 60).toString().padStart(2, '0');
+  const sCurrent = Math.floor(time % 60).toString().padStart(2, '0');
   
+  const totalSeconds = bars * 4 * (60 / bpm);
+  const mTotal = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const sTotal = Math.floor(totalSeconds % 60).toString().padStart(2, '0');
+
   return (
-    <div className="flex flex-col gap-1 min-w-[120px]">
-      <div className="flex items-center justify-between bg-[#1a1a1a] px-3 py-1.5 rounded-lg border border-[#333]">
-        <div className="flex flex-col">
-          <span className="text-[10px] text-[#8E9299] font-bold leading-none">ELAPSED</span>
-          <span className="text-sm font-mono text-[#00AAFF] font-bold mt-1">{m}:{s}</span>
-        </div>
-        <div className="h-8 w-px bg-[#333] mx-2" />
-        <div className="flex flex-col items-end">
-          <span className="text-[10px] text-[#8E9299] font-bold leading-none">POSITION</span>
-          <span className="text-sm font-mono text-white font-bold mt-1">{Math.floor(progress * 100)}%</span>
-        </div>
-      </div>
-      <div className="w-full h-1 bg-[#1a1a1a] rounded-full overflow-hidden border border-[#333]">
-        <div 
-          className="h-full bg-[#00AAFF] transition-all duration-100 ease-linear" 
-          style={{ width: `${progress * 100}%` }} 
-        />
-      </div>
+    <div className="px-2 border-l border-[#333] ml-1 flex items-center gap-2">
+      <span className="text-xs font-mono font-bold text-[#FF4444]">{mCurrent}:{sCurrent}</span>
+      <span className="text-[#8E9299] text-[0.625rem]">/</span>
+      <span className="text-xs font-mono font-bold text-[#8E9299]">{mTotal}:{sTotal}</span>
     </div>
   );
 };
@@ -165,6 +142,7 @@ export default function App() {
   const [loopPlayback, setLoopPlayback] = useState(true);
   const [autoStopRecord, setAutoStopRecord] = useState(false);
   const [bpm, setBpm] = useState(120);
+  const [zoom, setZoom] = useState(1);
   const [tracks, setTracks] = useState<TrackData[]>(INITIAL_TRACKS);
   const [templates, setTemplates] = useState<TrackTemplate[]>(() => {
     const saved = localStorage.getItem('track_templates');
@@ -283,8 +261,8 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light');
-    document.documentElement.classList.remove('zoom-1', 'zoom-2', 'zoom-2-5', 'zoom-3');
-    document.documentElement.classList.add(`zoom-${zoomLevel === 2.5 ? '2-5' : zoomLevel}`);
+    document.documentElement.classList.remove('zoom-0-5', 'zoom-1', 'zoom-2', 'zoom-2-5', 'zoom-3');
+    document.documentElement.classList.add(`zoom-${String(zoomLevel).replace('.', '-')}`);
   }, [theme, zoomLevel]);
 
   useEffect(() => {
@@ -423,9 +401,16 @@ export default function App() {
     if (!started) return;
 
     const currentTotalSteps = bars * 16;
-    const indices = Array.from({ length: currentTotalSteps }, (_, i) => i);
+    Tone.Transport.loop = true;
+    Tone.Transport.loopStart = 0;
+    Tone.Transport.loopEnd = bars * Tone.Time('1m').toSeconds();
 
-    const sequence = new Tone.Sequence((time, currentStepIndex) => {
+    const repeatEventId = Tone.Transport.scheduleRepeat((time) => {
+      // Use ticks for perfect synchronization even during tempo changes
+      const currentTicks = Tone.Transport.getTicksAtTime(time);
+      const ticksPer16n = Tone.Transport.PPQ / 4;
+      const currentStepIndex = Math.round(currentTicks / ticksPer16n) % currentTotalSteps;
+
       if (metronomeRef.current && currentStepIndex % 4 === 0) {
         engine.playMetronome(currentStepIndex % 16 === 0, time);
       }
@@ -454,16 +439,16 @@ export default function App() {
       
       if (!performanceModeRef.current) {
         Tone.Draw.schedule(() => {
-          const currentEls = document.getElementsByClassName('is-current');
-          while(currentEls.length > 0) {
-            currentEls[0].classList.remove('is-current');
-          }
           const nextEls = document.getElementsByClassName(`step-container-${currentStepIndex}`);
-          for (let i = 0; i < nextEls.length; i++) {
-            nextEls[i].classList.add('is-current');
+          const globalPlayhead = document.getElementById('global-playhead');
+          
+          if (nextEls.length > 0 && globalPlayhead) {
+            const el = nextEls[0] as HTMLElement;
+            // Center the playhead correctly
+            globalPlayhead.style.transform = `translateX(${el.offsetLeft + el.offsetWidth / 2}px)`;
+            
             // Auto scroll container wrapper if trackFollow is enabled
-            if (i === 0 && trackFollowRef.current) {
-              const el = nextEls[i] as HTMLElement;
+            if (trackFollowRef.current) {
               const container = el.closest('.custom-scrollbar');
               if (container) {
                 // Scroll container to center the element smoothly
@@ -483,10 +468,8 @@ export default function App() {
             Tone.Transport.stop();
             Tone.Draw.cancel();
             setPlaying(false);
-            const currentEls = document.getElementsByClassName('is-current');
-            while(currentEls.length > 0) {
-              currentEls[0].classList.remove('is-current');
-            }
+            const globalPlayhead = document.getElementById('global-playhead');
+            if (globalPlayhead) globalPlayhead.style.transform = 'translateX(-1000px)';
             stepRef.current = 0;
           }, time + Tone.Time('16n').toSeconds());
         }
@@ -501,12 +484,10 @@ export default function App() {
       }
       
       stepRef.current = currentStepIndex + 1;
-    }, indices, '16n');
-
-    sequence.start(0);
+    }, '16n');
 
     return () => {
-      sequence.dispose();
+      Tone.Transport.clear(repeatEventId);
     };
   }, [started, bars]);
 
@@ -540,13 +521,15 @@ export default function App() {
     Tone.Transport.stop();
     Tone.Draw.cancel();
     setPlaying(false);
-    const currentEls = document.getElementsByClassName('is-current');
-    while(currentEls.length > 0) {
-      currentEls[0].classList.remove('is-current');
-    }
-    const nextEls = document.getElementsByClassName('step-container-0');
-    for (let i = 0; i < nextEls.length; i++) {
-      nextEls[i].classList.add('is-current');
+    const globalPlayhead = document.getElementById('global-playhead');
+    if (globalPlayhead) {
+      const firstEls = document.getElementsByClassName('step-container-0');
+      if (firstEls.length > 0) {
+        const el = firstEls[0] as HTMLElement;
+        globalPlayhead.style.transform = `translateX(${el.offsetLeft + el.offsetWidth / 2}px)`;
+      } else {
+        globalPlayhead.style.transform = 'translateX(-1000px)';
+      }
     }
     stepRef.current = 0;
   };
@@ -1108,48 +1091,54 @@ export default function App() {
   const loadProject = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setIsDownloading(true); // Re-using loading modal overlay
     const reader = new FileReader();
     reader.onload = (event) => {
       // Stop playback before loading new data to prevent glitches
       Tone.Transport.stop();
       setPlaying(false);
-      try {
-        const project = JSON.parse(event.target?.result as string);
-        if (project.bpm) setBpm(project.bpm);
-        if (project.bars) setBars(project.bars);
-        if (project.swing !== undefined) setSwing(project.swing);
-        if (project.delayWet !== undefined) setDelayWet(project.delayWet);
-        if (project.delayTime) setDelayTime(project.delayTime);
-        if (project.reverbWet !== undefined) setReverbWet(project.reverbWet);
-        if (project.distWet !== undefined) setDistWet(project.distWet);
-        if (project.masterChorusWet !== undefined) setMasterChorusWet(project.masterChorusWet);
-        if (project.masterBitcrusherWet !== undefined) setMasterBitcrusherWet(project.masterBitcrusherWet);
-        if (project.masterVolume !== undefined) setMasterVolume(project.masterVolume);
-        if (project.masterCompThreshold !== undefined) setMasterCompThreshold(project.masterCompThreshold);
-        if (project.masterCompRatio !== undefined) setMasterCompRatio(project.masterCompRatio);
-        if (project.masterEqLow !== undefined) setMasterEqLow(project.masterEqLow);
-        if (project.masterEqMid !== undefined) setMasterEqMid(project.masterEqMid);
-        if (project.masterEqHigh !== undefined) setMasterEqHigh(project.masterEqHigh);
-        if (project.masterFilterFreq !== undefined) setMasterFilterFreq(project.masterFilterFreq);
-        if (project.tracks) {
-          const loadedBars = project.bars || 1;
-          const paddedTracks = project.tracks.map((track: TrackData) => {
-            const targetLength = track.stepsCount || loadedBars * 16;
-            if (track.steps.length < targetLength) {
-              const newSteps = [...track.steps];
-              for (let i = track.steps.length; i < targetLength; i++) {
-                newSteps[i] = { active: false, note: track.defaultNote || 'C4', velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 };
+      
+      setTimeout(() => {
+        try {
+          const project = JSON.parse(event.target?.result as string);
+          if (project.bpm) setBpm(project.bpm);
+          if (project.bars) setBars(project.bars);
+          if (project.swing !== undefined) setSwing(project.swing);
+          if (project.delayWet !== undefined) setDelayWet(project.delayWet);
+          if (project.delayTime) setDelayTime(project.delayTime);
+          if (project.reverbWet !== undefined) setReverbWet(project.reverbWet);
+          if (project.distWet !== undefined) setDistWet(project.distWet);
+          if (project.masterChorusWet !== undefined) setMasterChorusWet(project.masterChorusWet);
+          if (project.masterBitcrusherWet !== undefined) setMasterBitcrusherWet(project.masterBitcrusherWet);
+          if (project.masterVolume !== undefined) setMasterVolume(project.masterVolume);
+          if (project.masterCompThreshold !== undefined) setMasterCompThreshold(project.masterCompThreshold);
+          if (project.masterCompRatio !== undefined) setMasterCompRatio(project.masterCompRatio);
+          if (project.masterEqLow !== undefined) setMasterEqLow(project.masterEqLow);
+          if (project.masterEqMid !== undefined) setMasterEqMid(project.masterEqMid);
+          if (project.masterEqHigh !== undefined) setMasterEqHigh(project.masterEqHigh);
+          if (project.masterFilterFreq !== undefined) setMasterFilterFreq(project.masterFilterFreq);
+          if (project.tracks) {
+            const loadedBars = project.bars || 1;
+            const paddedTracks = project.tracks.map((track: TrackData) => {
+              const targetLength = track.stepsCount || loadedBars * 16;
+              if (track.steps.length < targetLength) {
+                const newSteps = [...track.steps];
+                for (let i = track.steps.length; i < targetLength; i++) {
+                  newSteps[i] = { active: false, note: track.defaultNote || 'C4', velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 };
+                }
+                return { ...track, steps: newSteps, stepsCount: targetLength };
               }
-              return { ...track, steps: newSteps, stepsCount: targetLength };
-            }
-            return track;
-          });
-          setTracks(paddedTracks);
+              return track;
+            });
+            setTracks(paddedTracks);
+          }
+        } catch (err: any) {
+          console.error('Invalid project file:', err);
+          alert('Failed to load project file. It may be corrupted or too large. Error: ' + err.message);
+        } finally {
+          setIsDownloading(false);
         }
-      } catch (err: any) {
-        console.error('Invalid project file:', err);
-        alert('Failed to load project file. It may be corrupted or too large. Error: ' + err.message);
-      }
+      }, 50);
     };
     reader.readAsText(file);
     // Reset input so the same file can be loaded again if needed
@@ -1428,7 +1417,7 @@ export default function App() {
                   min="1" max="128" 
                   value={bars} 
                   onChange={e => handleBarsChange(Math.max(1, Math.min(128, parseInt(e.target.value) || 1)))}
-                  className="bg-[#242424] text-xs p-1 rounded border border-[#333] outline-none w-16 text-center"
+                  className="bg-[#242424] text-xs p-1 rounded border border-[#333] outline-none w-12 text-center"
                 />
                 <button 
                   onClick={duplicateBars} 
@@ -1437,6 +1426,7 @@ export default function App() {
                 >
                   <CopyPlus className="w-3.5 h-3.5" />
                 </button>
+                <TimeDisplay bars={bars} bpm={bpm} performanceMode={performanceMode} />
               </div>
 
               <div className="h-6 w-px bg-[#333] hidden sm:block"></div>
@@ -1457,6 +1447,7 @@ export default function App() {
                   className="bg-transparent text-[#8E9299] hover:text-white text-xs px-2 py-1 outline-none font-bold"
                   title="UI Size / Zoom Mode"
                 >
+                  <option value={0.5} className="bg-[#1a1a1a]">SIZE 0.5</option>
                   <option value={1} className="bg-[#1a1a1a]">SIZE 1</option>
                   <option value={2} className="bg-[#1a1a1a]">SIZE 2</option>
                   <option value={2.5} className="bg-[#1a1a1a]">SIZE 2.5</option>
@@ -1706,14 +1697,21 @@ export default function App() {
                   <span className="text-[0.625rem] font-bold text-[#666]">{bars} BARS</span>
                 </div>
                 <div className="flex items-center p-3 sm:p-4 bg-[#151619] relative">
+                  <div 
+                    id="global-playhead" 
+                    className="absolute top-0 bottom-[-10000px] w-0.5 bg-[#FF4444] shadow-[0_0_8px_#FF4444] z-10 pointer-events-none opacity-80"
+                    style={{ transform: 'translateX(-1000px)', willChange: 'transform' }} 
+                  />
                   {Array.from({ length: bars * 16 }).map((_, stepIndex) => (
                     <React.Fragment key={stepIndex}>
                       {stepIndex > 0 && stepIndex % 16 === 0 && <div className="h-full w-px bg-transparent mx-2 sm:mx-3 flex-shrink-0"></div>}
-                      <div className={`flex-shrink-0 w-8 sm:w-10 flex justify-center relative step-container step-container-${stepIndex} ${stepIndex % 4 === 0 && stepIndex % 16 !== 0 ? "ml-2 sm:ml-3" : "ml-1 sm:ml-1.5"}`}>
+                      <div 
+                        className={`flex-shrink-0 flex justify-center relative step-container step-container-${stepIndex} ${stepIndex % 4 === 0 && stepIndex % 16 !== 0 ? "ml-2 sm:ml-3" : "ml-1 sm:ml-1.5"}`}
+                        style={{ width: `${40 * zoom}px` }}
+                      >
                         <span className={`text-[0.625rem] font-bold timeline-text text-[#666]`}>
                           {stepIndex % 4 === 0 ? (stepIndex / 4) + 1 : ''}
                         </span>
-                        <div className="playhead-indicator absolute -top-3 sm:-top-4 left-1/2 -translate-x-1/2 w-0.5 bg-[#FF4444] opacity-80 z-10 pointer-events-none shadow-[0_0_8px_#FF4444]" />
                       </div>
                     </React.Fragment>
                   ))}
@@ -1746,6 +1744,7 @@ export default function App() {
                         onToggleStep={toggleStep}
                         onOpenSettings={handleOpenSettings}
                         onOpenAdvanced={(idx) => setAdvancedSettingsModal(idx)}
+                        zoom={zoom}
                       />
                     ) : (
                       <motion.div 
@@ -1777,6 +1776,7 @@ export default function App() {
                           onToggleStep={toggleStep}
                           onOpenSettings={handleOpenSettings}
                           onOpenAdvanced={(idx) => setAdvancedSettingsModal(idx)}
+                          zoom={zoom}
                         />
                       </motion.div>
                     )}

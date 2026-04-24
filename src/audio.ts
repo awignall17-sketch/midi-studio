@@ -3,6 +3,7 @@ import * as Tone from 'tone';
 class AudioEngine {
   masterVol: Tone.Volume;
   masterCompressor: Tone.Compressor;
+  masterLimiter: Tone.Limiter;
   masterEQ: Tone.EQ3;
   masterFilter: Tone.Filter;
   masterHPF: Tone.Filter;
@@ -34,12 +35,14 @@ class AudioEngine {
       attack: 0.003,
       release: 0.25
     });
+    this.masterLimiter = new Tone.Limiter(-0.1);
     this.masterVol = new Tone.Volume(0).connect(this.masterHPF);
     this.masterHPF.connect(this.masterFilter);
     this.masterFilter.connect(this.masterEQ);
     this.masterEQ.connect(this.stereoWidener);
     this.stereoWidener.connect(this.masterCompressor);
-    this.masterCompressor.toDestination();
+    this.masterCompressor.connect(this.masterLimiter);
+    this.masterLimiter.toDestination();
   }
 
   setHeadphoneMode(enabled: boolean) {
@@ -242,7 +245,9 @@ class AudioEngine {
     }
     
     const fx = this.trackFX[trackId];
-    fx.channel.volume.value = volume;
+    // Lower gain automatically by 10dB internally to guarantee massive mix headroom for the Limiter 
+    // and prevent poly-overlapping signals from natively clipping the Web Audio buses
+    fx.channel.volume.value = volume - 10;
     fx.channel.pan.value = pan;
     fx.channel.mute = muted;
     fx.delay.wet.value = delayWet;
