@@ -1238,9 +1238,9 @@ export default function App() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <button 
               onClick={() => handleStart('midi')}
-              className="w-full py-16 bg-[#FF4444] hover:bg-[#ff5555] text-white font-bold rounded-2xl transition-all transform hover:scale-105 flex flex-col items-center gap-4 shadow-xl"
+              className="w-full py-16 bg-[#FF4444] hover:bg-[#ff5555] text-white font-bold rounded-2xl transition-all transform hover:scale-105 flex flex-col items-center gap-4 shadow-xl px-2 text-center leading-tight"
             >
-              <span className="text-3xl tracking-wider">MIDI STUDIO</span>
+              <span className="text-2xl sm:text-3xl tracking-wider">MIDI CREATOR PRO</span>
               <span className="text-base font-normal opacity-90">Sequencer & Beats</span>
             </button>
             <button 
@@ -1322,12 +1322,12 @@ export default function App() {
                   engine.stopAll();
                 }}
                 className="p-2 bg-[#333] hover:bg-[#444] rounded-lg text-[#8E9299] hover:text-white transition-colors flex items-center gap-2"
-                title="Leave MIDI Studio"
+                title="Leave MIDI Creator Pro"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span className="text-xs font-bold hidden sm:inline">HOME</span>
               </button>
-              <h1 className="text-xl font-bold tracking-tighter text-[#FF4444]">MIDI STUDIO</h1>
+              <h1 className="text-xl font-bold tracking-tighter text-[#FF4444]">MIDI CREATOR PRO</h1>
               <button 
                 onClick={() => setShowHelpModal(true)}
                 className="p-1.5 bg-[#333] hover:bg-[#444] rounded-full text-[#8E9299] hover:text-white transition-colors"
@@ -1908,7 +1908,7 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-3xl font-black text-white tracking-tighter">
-                    PRO <span className="text-[#00AAFF]">STUDIO</span> GUIDE
+                    CREATOR <span className="text-[#00AAFF]">PRO</span> GUIDE
                   </h2>
                   <p className="text-[#8E9299] text-xs font-bold uppercase tracking-widest mt-1">Advanced Techniques & Workflow</p>
                 </div>

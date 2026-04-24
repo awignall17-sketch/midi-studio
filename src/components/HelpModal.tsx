@@ -19,7 +19,7 @@ export function HelpModal({ onClose }: Props) {
       title: 'Adding & Sequencing Beats',
       icon: <MousePointerClick className="w-6 h-6 text-[#00AAFF]" />,
       tags: ['click', 'press', 'add', 'beat', 'delete', 'remove', 'sequence'],
-      description: 'The foundation of MIDI Studio. Learn how to place, move, and organize your rhythmic patterns.',
+      description: 'The foundation of MIDI Creator Pro. Learn how to place, move, and organize your rhythmic patterns.',
       content: `• Click any gray rectangle in the track timeline to add a beat.\n• Click an active beat again to remove it.\n• You can quickly sequence beats by tapping along the track timeline.\n\n### Patterns & Loops\nEach track consists of a series of steps. By default, patterns are 16 steps long (1 bar). You can expand your project using the BARS control in the top toolbar to create longer compositions.`
     },
     {
@@ -122,7 +122,7 @@ export function HelpModal({ onClose }: Props) {
               {selectedTopic !== null ? helpTopics[selectedTopic].title : 'USER GUIDE & HELP CENTER'}
             </h2>
             <p className="text-[10px] text-[#8E9299] font-bold uppercase tracking-widest">
-              {selectedTopic !== null ? 'Documentation Article' : 'Everything you need to know about MIDI Studio'}
+              {selectedTopic !== null ? 'Documentation Article' : 'Everything you need to know about MIDI Creator Pro'}
             </p>
           </div>
         </div>

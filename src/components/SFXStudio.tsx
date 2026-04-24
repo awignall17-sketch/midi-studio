@@ -265,7 +265,7 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
     {
       title: "Export & Live Rec",
       icon: Download,
-      description: "Capture your creations for use in MIDI Studio or external projects.",
+      description: "Capture your creations for use in MIDI Creator Pro or external projects.",
       details: [
         "Export Sound: Renders a single, high-quality audio file of the current setup.",
         "Export Sequence: Renders the entire 16-step animation as a loop.",
