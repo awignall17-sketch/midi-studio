@@ -212,7 +212,7 @@ export default function App() {
       icon: Keyboard,
       description: "Master the studio tools to build entire songs in minutes, not hours.",
       details: [
-        "Use 'USE IN MIDI' from SFX Studio to instantly transfer your custom sounds.",
+        "Use 'USE IN MIDI BEAT PRO' from SFX Studio to instantly transfer your custom sounds.",
         "Toggle 'AUTO-STOP' when recording to get perfect, seamless export loops.",
         "Duplicate tracks for easy layering of similar patterns.",
         "Use Undo/Redo (Ctrl+Z / Ctrl+Y) to safely experiment with your mix."
@@ -1088,61 +1088,65 @@ export default function App() {
     });
   };
 
-  const loadProject = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const loadProject = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setIsDownloading(true); // Re-using loading modal overlay
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      // Stop playback before loading new data to prevent glitches
+    setIsDownloading(true);
+
+    try {
       Tone.Transport.stop();
       setPlaying(false);
+
+      // Read file asynchronously off main thread where possible
+      const text = await file.text();
       
-      setTimeout(() => {
-        try {
-          const project = JSON.parse(event.target?.result as string);
-          if (project.bpm) setBpm(project.bpm);
-          if (project.bars) setBars(project.bars);
-          if (project.swing !== undefined) setSwing(project.swing);
-          if (project.delayWet !== undefined) setDelayWet(project.delayWet);
-          if (project.delayTime) setDelayTime(project.delayTime);
-          if (project.reverbWet !== undefined) setReverbWet(project.reverbWet);
-          if (project.distWet !== undefined) setDistWet(project.distWet);
-          if (project.masterChorusWet !== undefined) setMasterChorusWet(project.masterChorusWet);
-          if (project.masterBitcrusherWet !== undefined) setMasterBitcrusherWet(project.masterBitcrusherWet);
-          if (project.masterVolume !== undefined) setMasterVolume(project.masterVolume);
-          if (project.masterCompThreshold !== undefined) setMasterCompThreshold(project.masterCompThreshold);
-          if (project.masterCompRatio !== undefined) setMasterCompRatio(project.masterCompRatio);
-          if (project.masterEqLow !== undefined) setMasterEqLow(project.masterEqLow);
-          if (project.masterEqMid !== undefined) setMasterEqMid(project.masterEqMid);
-          if (project.masterEqHigh !== undefined) setMasterEqHigh(project.masterEqHigh);
-          if (project.masterFilterFreq !== undefined) setMasterFilterFreq(project.masterFilterFreq);
-          if (project.tracks) {
-            const loadedBars = project.bars || 1;
-            const paddedTracks = project.tracks.map((track: TrackData) => {
-              const targetLength = track.stepsCount || loadedBars * 16;
-              if (track.steps.length < targetLength) {
-                const newSteps = [...track.steps];
-                for (let i = track.steps.length; i < targetLength; i++) {
-                  newSteps[i] = { active: false, note: track.defaultNote || 'C4', velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 };
-                }
-                return { ...track, steps: newSteps, stepsCount: targetLength };
-              }
-              return track;
-            });
-            setTracks(paddedTracks);
+      // Yield to the UI to render the loading overlay before parsing huge JSON
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      const project = JSON.parse(text);
+      
+      if (project.bpm) setBpm(project.bpm);
+      if (project.bars) setBars(project.bars);
+      if (project.swing !== undefined) setSwing(project.swing);
+      if (project.delayWet !== undefined) setDelayWet(project.delayWet);
+      if (project.delayTime) setDelayTime(project.delayTime);
+      if (project.reverbWet !== undefined) setReverbWet(project.reverbWet);
+      if (project.distWet !== undefined) setDistWet(project.distWet);
+      if (project.masterChorusWet !== undefined) setMasterChorusWet(project.masterChorusWet);
+      if (project.masterBitcrusherWet !== undefined) setMasterBitcrusherWet(project.masterBitcrusherWet);
+      if (project.masterVolume !== undefined) setMasterVolume(project.masterVolume);
+      if (project.masterCompThreshold !== undefined) setMasterCompThreshold(project.masterCompThreshold);
+      if (project.masterCompRatio !== undefined) setMasterCompRatio(project.masterCompRatio);
+      if (project.masterEqLow !== undefined) setMasterEqLow(project.masterEqLow);
+      if (project.masterEqMid !== undefined) setMasterEqMid(project.masterEqMid);
+      if (project.masterEqHigh !== undefined) setMasterEqHigh(project.masterEqHigh);
+      if (project.masterFilterFreq !== undefined) setMasterFilterFreq(project.masterFilterFreq);
+      
+      if (project.tracks && Array.isArray(project.tracks)) {
+        const loadedBars = project.bars || 1;
+        const paddedTracks = project.tracks.map((track: any) => {
+          // Guarantee a unique ID is present, fixing audio overlap bugs
+          const trackId = track.id || Math.random().toString(36).substring(2, 9);
+          const targetLength = track.stepsCount || loadedBars * 16;
+          
+          let newSteps = Array.isArray(track.steps) ? [...track.steps] : [];
+          if (newSteps.length < targetLength) {
+            for (let i = newSteps.length; i < targetLength; i++) {
+              newSteps.push({ active: false, note: track.defaultNote || 'C4', velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 });
+            }
           }
-        } catch (err: any) {
-          console.error('Invalid project file:', err);
-          alert('Failed to load project file. It may be corrupted or too large. Error: ' + err.message);
-        } finally {
-          setIsDownloading(false);
-        }
-      }, 50);
-    };
-    reader.readAsText(file);
-    // Reset input so the same file can be loaded again if needed
-    e.target.value = '';
+          return { ...track, id: trackId, steps: newSteps, stepsCount: targetLength };
+        });
+        setTracks(paddedTracks);
+      }
+    } catch (err: any) {
+      console.error('Invalid project file:', err);
+      alert('Failed to load project file. It may be corrupted or too large. Error: ' + err.message);
+    } finally {
+      setIsDownloading(false);
+      // Reset input so the same file can be loaded again if needed
+      e.target.value = '';
+    }
   };
 
   const toggleMute = React.useCallback((trackIndex: number) => {
@@ -1240,7 +1244,10 @@ export default function App() {
               onClick={() => handleStart('midi')}
               className="w-full py-16 bg-[#FF4444] hover:bg-[#ff5555] text-white font-bold rounded-2xl transition-all transform hover:scale-105 flex flex-col items-center gap-4 shadow-xl px-2 text-center leading-tight"
             >
-              <span className="text-2xl sm:text-3xl tracking-wider">MIDI CREATOR PRO</span>
+              <div className="flex flex-col items-center leading-none gap-2">
+                <span className="text-2xl sm:text-3xl tracking-wider">MIDI BEAT</span>
+                <span className="text-2xl sm:text-3xl tracking-wider">PRO</span>
+              </div>
               <span className="text-base font-normal opacity-90">Sequencer & Beats</span>
             </button>
             <button 
@@ -1322,12 +1329,12 @@ export default function App() {
                   engine.stopAll();
                 }}
                 className="p-2 bg-[#333] hover:bg-[#444] rounded-lg text-[#8E9299] hover:text-white transition-colors flex items-center gap-2"
-                title="Leave MIDI Creator Pro"
+                title="Leave Midi Beat Pro"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span className="text-xs font-bold hidden sm:inline">HOME</span>
               </button>
-              <h1 className="text-xl font-bold tracking-tighter text-[#FF4444]">MIDI CREATOR PRO</h1>
+              <h1 className="text-xl font-bold tracking-tighter text-[#FF4444]">MIDI BEAT PRO</h1>
               <button 
                 onClick={() => setShowHelpModal(true)}
                 className="p-1.5 bg-[#333] hover:bg-[#444] rounded-full text-[#8E9299] hover:text-white transition-colors"

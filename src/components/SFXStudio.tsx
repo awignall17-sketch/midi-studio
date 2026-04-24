@@ -265,7 +265,7 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
     {
       title: "Export & Live Rec",
       icon: Download,
-      description: "Capture your creations for use in MIDI Creator Pro or external projects.",
+      description: "Capture your creations for use in Midi Beat Pro or external projects.",
       details: [
         "Export Sound: Renders a single, high-quality audio file of the current setup.",
         "Export Sequence: Renders the entire 16-step animation as a loop.",
@@ -918,7 +918,7 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
               <span className="text-xs font-mono font-bold w-12 text-center text-[#8E9299]">{Math.round(zoom * 100)}%</span>
               <button onClick={() => setZoom(Math.min(1.5, zoom + 0.1))} className="p-2 hover:bg-[#2A2B30] text-[#8E9299]"><Plus size={16} /></button>
             </div>
-            <button onClick={handleSendToMIDI} disabled={isDownloading} className="px-5 py-2.5 bg-[#8A2BE2] text-white font-black text-xs rounded-xl border-b-4 border-[#6a1bb2] active:border-b-0 active:translate-y-1">USE IN MIDI</button>
+            <button onClick={handleSendToMIDI} disabled={isDownloading} className="px-5 py-2.5 bg-[#8A2BE2] text-white font-black text-xs rounded-xl border-b-4 border-[#6a1bb2] active:border-b-0 active:translate-y-1">USE IN MIDI BEAT PRO</button>
           </div>
         </header>
 
