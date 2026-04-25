@@ -397,6 +397,30 @@ export default function App() {
   const trackFollowRef = useRef(trackFollow);
   useEffect(() => { trackFollowRef.current = trackFollow; }, [trackFollow]);
 
+  const stepOffsetsRef = useRef<number[]>([]);
+  
+  // Re-calculate step offsets whenever bars or layout changes
+  const updateStepOffsets = React.useCallback(() => {
+    const offsets: number[] = [];
+    const totalSteps = bars * 16;
+    
+    // We sample the steps from tracks to get horizontal offsets
+    // This assumes all tracks are aligned horizontally
+    for (let i = 0; i < totalSteps; i++) {
+      const el = document.querySelector(`.step-container-${i}`) as HTMLElement;
+      if (el) {
+        offsets[i] = el.offsetLeft + el.offsetWidth / 2;
+      }
+    }
+    stepOffsetsRef.current = offsets;
+  }, [bars]);
+
+  useEffect(() => {
+    // Small delay to ensure DOM is rendered before calculating offsets
+    const timer = setTimeout(updateStepOffsets, 1000);
+    return () => clearTimeout(timer);
+  }, [updateStepOffsets, tracks.length, bars]);
+
   useEffect(() => {
     if (!started) return;
 
@@ -439,24 +463,27 @@ export default function App() {
       
       if (!performanceModeRef.current) {
         Tone.Draw.schedule(() => {
-          const nextEls = document.getElementsByClassName(`step-container-${currentStepIndex}`);
           const globalPlayhead = document.getElementById('global-playhead');
-          
-          if (nextEls.length > 0 && globalPlayhead) {
-            const el = nextEls[0] as HTMLElement;
-            // Center the playhead correctly
-            globalPlayhead.style.transform = `translateX(${el.offsetLeft + el.offsetWidth / 2}px)`;
+          if (!globalPlayhead) return;
+
+          const offset = stepOffsetsRef.current[currentStepIndex];
+          if (offset !== undefined) {
+            globalPlayhead.style.transform = `translateX(${offset}px)`;
             
-            // Auto scroll container wrapper if trackFollow is enabled
             if (trackFollowRef.current) {
-              const container = el.closest('.custom-scrollbar');
+              const container = globalPlayhead.closest('.custom-scrollbar');
               if (container) {
-                // Scroll container to center the element smoothly
-                const containerRect = container.getBoundingClientRect();
-                const elRect = el.getBoundingClientRect();
-                const scrollLeft = el.offsetLeft - containerRect.width / 2 + elRect.width / 2;
+                const containerWidth = container.clientWidth;
+                const scrollLeft = offset - containerWidth / 2;
                 container.scrollTo({ left: scrollLeft, behavior: 'auto' });
               }
+            }
+          } else {
+            // Fallback if offsets aren't ready
+            const nextEls = document.getElementsByClassName(`step-container-${currentStepIndex}`);
+            if (nextEls.length > 0) {
+              const el = nextEls[0] as HTMLElement;
+              globalPlayhead.style.transform = `translateX(${el.offsetLeft + el.offsetWidth / 2}px)`;
             }
           }
         }, time);
@@ -1094,58 +1121,138 @@ export default function App() {
     setIsDownloading(true);
 
     try {
+      // 1. Stop and Clean House
       Tone.Transport.stop();
+      Tone.Transport.cancel(); // Remove all scheduled events
       setPlaying(false);
-
-      // Read file asynchronously off main thread where possible
-      const text = await file.text();
+      stepRef.current = 0;
       
-      // Yield to the UI to render the loading overlay before parsing huge JSON
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Clear global playhead position immediately to avoid glitches
+      const globalPlayhead = document.getElementById('global-playhead');
+      if (globalPlayhead) globalPlayhead.style.transform = 'translateX(-1000px)';
+
+      // 2. Read and Parse
+      const text = await file.text();
+      await new Promise(resolve => setTimeout(resolve, 50)); // Yield to UI
 
       const project = JSON.parse(text);
+      if (!project || typeof project !== 'object') throw new Error('Invalid project structure');
+
+      // 3. Update Settings (Legacy support via default values)
+      if (project.bpm) {
+        const bpmVal = Number(project.bpm);
+        setBpm(isNaN(bpmVal) ? 120 : Math.max(40, Math.min(300, bpmVal)));
+      }
       
-      if (project.bpm) setBpm(project.bpm);
-      if (project.bars) setBars(project.bars);
-      if (project.swing !== undefined) setSwing(project.swing);
-      if (project.delayWet !== undefined) setDelayWet(project.delayWet);
-      if (project.delayTime) setDelayTime(project.delayTime);
-      if (project.reverbWet !== undefined) setReverbWet(project.reverbWet);
-      if (project.distWet !== undefined) setDistWet(project.distWet);
-      if (project.masterChorusWet !== undefined) setMasterChorusWet(project.masterChorusWet);
-      if (project.masterBitcrusherWet !== undefined) setMasterBitcrusherWet(project.masterBitcrusherWet);
-      if (project.masterVolume !== undefined) setMasterVolume(project.masterVolume);
-      if (project.masterCompThreshold !== undefined) setMasterCompThreshold(project.masterCompThreshold);
-      if (project.masterCompRatio !== undefined) setMasterCompRatio(project.masterCompRatio);
-      if (project.masterEqLow !== undefined) setMasterEqLow(project.masterEqLow);
-      if (project.masterEqMid !== undefined) setMasterEqMid(project.masterEqMid);
-      if (project.masterEqHigh !== undefined) setMasterEqHigh(project.masterEqHigh);
-      if (project.masterFilterFreq !== undefined) setMasterFilterFreq(project.masterFilterFreq);
+      const loadedBars = Math.max(1, Math.min(128, Number(project.bars || 1)));
+      setBars(loadedBars);
       
+      if (project.metronome !== undefined) setMetronome(!!project.metronome);
+      if (project.autoStopRecord !== undefined) setAutoStopRecord(!!project.autoStopRecord);
+      if (project.exportFormat) setExportFormat(project.exportFormat as 'mp3' | 'wav');
+      if (project.performanceMode !== undefined) setPerformanceMode(!!project.performanceMode);
+      if (project.trackFollow !== undefined) setTrackFollow(!!project.trackFollow);
+      
+      setSwing(Number(project.swing || 0));
+      setDelayWet(Number(project.delayWet || 0));
+      setDelayTime(String(project.delayTime || '8n'));
+      setReverbWet(Number(project.reverbWet || 0));
+      setDistWet(Number(project.distWet || 0));
+      setMasterChorusWet(Number(project.masterChorusWet || 0));
+      setMasterBitcrusherWet(Number(project.masterBitcrusherWet || 0));
+      setMasterVolume(Number(project.masterVolume || 0));
+      setMasterCompThreshold(Number(project.masterCompThreshold || -24));
+      setMasterCompRatio(Number(project.masterCompRatio || 4));
+      setMasterEqLow(Number(project.masterEqLow || 0));
+      setMasterEqMid(Number(project.masterEqMid || 0));
+      setMasterEqHigh(Number(project.masterEqHigh || 0));
+      setMasterFilterFreq(Number(project.masterFilterFreq || 20000));
+      
+      // 4. Robust Track Loading & Sanitization
       if (project.tracks && Array.isArray(project.tracks)) {
-        const loadedBars = project.bars || 1;
         const paddedTracks = project.tracks.map((track: any) => {
-          // Guarantee a unique ID is present, fixing audio overlap bugs
+          // Guarantee valid defaults for everything
           const trackId = track.id || Math.random().toString(36).substring(2, 9);
+          const defaultNote = track.defaultNote || 'C4';
           const targetLength = track.stepsCount || loadedBars * 16;
           
-          let newSteps = Array.isArray(track.steps) ? [...track.steps] : [];
-          if (newSteps.length < targetLength) {
-            for (let i = newSteps.length; i < targetLength; i++) {
-              newSteps.push({ active: false, note: track.defaultNote || 'C4', velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 });
+          let rawSteps = Array.isArray(track.steps) ? track.steps : [];
+          let sanitizedSteps = rawSteps.map((step: any) => ({
+            active: !!step?.active,
+            note: step?.note || defaultNote,
+            velocity: typeof step?.velocity === 'number' ? step.velocity : 0.8,
+            duration: step?.duration || '16n',
+            offset: typeof step?.offset === 'number' ? step.offset : 0,
+            stepSpan: typeof step?.stepSpan === 'number' ? step.stepSpan : 1,
+            // Support very old versions that might have used different keys
+            ...(step?.pitch ? { note: step.pitch } : {})
+          }));
+
+          // Fill/Truncate steps to match project length
+          if (sanitizedSteps.length < targetLength) {
+            for (let i = sanitizedSteps.length; i < targetLength; i++) {
+              sanitizedSteps.push({ active: false, note: defaultNote, velocity: 0.8, duration: '16n', offset: 0, stepSpan: 1 });
             }
+          } else if (sanitizedSteps.length > targetLength) {
+            sanitizedSteps = sanitizedSteps.slice(0, targetLength);
           }
-          return { ...track, id: trackId, steps: newSteps, stepsCount: targetLength };
+
+          return {
+            ...track,
+            id: trackId,
+            name: String(track.name || 'Untitled'),
+            type: track.type || 'melodic',
+            instrument: track.instrument || 'synth_lead',
+            color: track.color || '#AA00FF',
+            volume: typeof track.volume === 'number' ? track.volume : 0,
+            pan: typeof track.pan === 'number' ? track.pan : 0,
+            muted: !!track.muted,
+            solo: !!track.solo,
+            defaultNote: defaultNote,
+            delayWet: Number(track.delayWet || 0),
+            reverbWet: Number(track.reverbWet || 0),
+            distWet: Number(track.distWet || 0),
+            chorusWet: Number(track.chorusWet || 0),
+            bitcrusherWet: Number(track.bitcrusherWet || 0),
+            filterCutoff: Number(track.filterCutoff || 20000),
+            filterResonance: Number(track.filterResonance || 0),
+            drive: Number(track.drive || 0),
+            lfoRate: Number(track.lfoRate || 0),
+            ampMod: Number(track.ampMod || 0),
+            steps: sanitizedSteps,
+            stepsCount: targetLength
+          };
         });
+        
         setTracks(paddedTracks);
+        tracksRef.current = paddedTracks; // Sync Ref immediately to prevent timing glitches
+        
+        // Immediate update of offsets after state changes to prevent playhead jumping
+        setTimeout(updateStepOffsets, 100);
       }
+
+      // Re-apply master settings to the engine just in case
+      engine.setMasterFX(
+        Number(project.delayWet || 0),
+        String(project.delayTime || '8n'),
+        Number(project.reverbWet || 0),
+        Number(project.distWet || 0),
+        Number(project.masterChorusWet || 0),
+        Number(project.masterBitcrusherWet || 0),
+        Number(project.masterVolume || 0),
+        Number(project.masterEqLow || 0),
+        Number(project.masterEqMid || 0),
+        Number(project.masterEqHigh || 0),
+        Number(project.masterFilterFreq || 20000)
+      );
+
     } catch (err: any) {
       console.error('Invalid project file:', err);
-      alert('Failed to load project file. It may be corrupted or too large. Error: ' + err.message);
+      alert('Failed to load project file. Help: Make sure it is a valid JSON file exported from this app. Error: ' + err.message);
     } finally {
       setIsDownloading(false);
-      // Reset input so the same file can be loaded again if needed
-      e.target.value = '';
+      // Reset input
+      if (e.target) e.target.value = '';
     }
   };
 

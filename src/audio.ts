@@ -245,40 +245,41 @@ class AudioEngine {
     }
     
     const fx = this.trackFX[trackId];
-    // Lower gain automatically by 10dB internally to guarantee massive mix headroom for the Limiter 
-    // and prevent poly-overlapping signals from natively clipping the Web Audio buses
-    fx.channel.volume.value = volume - 10;
-    fx.channel.pan.value = pan;
+    // Lower gain automatically by 10dB internally to guarantee massive mix headroom
+    fx.channel.volume.rampTo(volume - 10, 0.1);
+    fx.channel.pan.rampTo(pan, 0.1);
     fx.channel.mute = muted;
-    fx.delay.wet.value = delayWet;
-    fx.reverb.wet.value = reverbWet;
-    fx.dist.wet.value = distWet;
-    fx.chorus.wet.value = chorusWet;
-    fx.bitcrusher.wet.value = bitcrusherWet;
+    fx.delay.wet.rampTo(delayWet, 0.1);
+    fx.reverb.wet.rampTo(reverbWet, 0.1);
+    fx.dist.wet.rampTo(distWet, 0.1);
+    fx.chorus.wet.rampTo(chorusWet, 0.1);
+    fx.bitcrusher.wet.rampTo(bitcrusherWet, 0.1);
     
-    // Automation params
-    fx.filter.frequency.value = filterCutoff;
-    fx.filter.Q.value = filterResonance;
+    fx.filter.frequency.rampTo(filterCutoff, 0.1);
+    fx.filter.Q.rampTo(filterResonance, 0.1);
     fx.dist.distortion = drive;
-    fx.tremolo.frequency.value = lfoRate;
-    fx.tremolo.depth.value = ampMod;
+    fx.tremolo.frequency.rampTo(lfoRate, 0.1);
+    fx.tremolo.depth.rampTo(ampMod, 0.1);
 
-    if (!this.trackInstruments[trackId] || (this.trackInstruments[trackId] as any)._type !== instrumentType || (this.trackInstruments[trackId] as any)._sampleUrl !== sampleUrl || (this.trackInstruments[trackId] as any)._sampleRootNote !== sampleRootNote || (this.trackInstruments[trackId] as any)._samplePlaybackSpeed !== samplePlaybackSpeed || (this.trackInstruments[trackId] as any)._sampleReverse !== sampleReverse || (this.trackInstruments[trackId] as any)._sampleDuration !== sampleDuration || (this.trackInstruments[trackId] as any)._sampleFade !== sampleFade || (this.trackInstruments[trackId] as any)._sampleStart !== sampleStart || (this.trackInstruments[trackId] as any)._sampleEnd !== sampleEnd) {
-      if (this.trackInstruments[trackId]) {
-        this.trackInstruments[trackId].dispose();
+    const inst = this.trackInstruments[trackId];
+    const isSameInstrument = inst && (inst as any)._type === instrumentType && (inst as any)._sampleUrl === sampleUrl;
+    
+    if (!isSameInstrument || (inst as any)._sampleRootNote !== sampleRootNote || (inst as any)._samplePlaybackSpeed !== samplePlaybackSpeed || (inst as any)._sampleReverse !== sampleReverse || (inst as any)._sampleDuration !== sampleDuration || (inst as any)._sampleFade !== sampleFade || (inst as any)._sampleStart !== sampleStart || (inst as any)._sampleEnd !== sampleEnd) {
+      if (inst) {
+        inst.dispose();
       }
-      const inst = this.createInstrument(instrumentType, sampleUrl, sampleRootNote, samplePlaybackSpeed, sampleReverse, sampleDuration, sampleFade, sampleStart, sampleEnd);
-      (inst as any)._type = instrumentType;
-      (inst as any)._sampleUrl = sampleUrl;
-      (inst as any)._sampleRootNote = sampleRootNote;
-      (inst as any)._samplePlaybackSpeed = samplePlaybackSpeed;
-      (inst as any)._sampleReverse = sampleReverse;
-      (inst as any)._sampleDuration = sampleDuration;
-      (inst as any)._sampleFade = sampleFade;
-      (inst as any)._sampleStart = sampleStart;
-      (inst as any)._sampleEnd = sampleEnd;
-      inst.connect(fx.filter);
-      this.trackInstruments[trackId] = inst;
+      const newInst = this.createInstrument(instrumentType, sampleUrl, sampleRootNote, samplePlaybackSpeed, sampleReverse, sampleDuration, sampleFade, sampleStart, sampleEnd);
+      (newInst as any)._type = instrumentType;
+      (newInst as any)._sampleUrl = sampleUrl;
+      (newInst as any)._sampleRootNote = sampleRootNote;
+      (newInst as any)._samplePlaybackSpeed = samplePlaybackSpeed;
+      (newInst as any)._sampleReverse = sampleReverse;
+      (newInst as any)._sampleDuration = sampleDuration;
+      (newInst as any)._sampleFade = sampleFade;
+      (newInst as any)._sampleStart = sampleStart;
+      (newInst as any)._sampleEnd = sampleEnd;
+      newInst.connect(fx.filter);
+      this.trackInstruments[trackId] = newInst;
     }
 
     if (envelope && this.trackInstruments[trackId] && typeof this.trackInstruments[trackId].set === 'function') {
