@@ -430,7 +430,7 @@ export const TrackRow = React.memo(function TrackRow({
       </div>
 
       {/* Steps */}
-      <div className={`flex items-center p-3 sm:p-4 bg-[#1a1b20] ${track.minimized ? 'py-1 opacity-60' : ''}`}>
+      <div className={`flex items-center p-3 sm:p-4 bg-transparent ${track.minimized ? 'py-1 opacity-60' : ''}`}>
         {Array.from({ length: bars * 16 }).map((_, stepIndex) => {
           const actualStepIndex = stepIndex % (track.stepsCount || bars * 16);
           const step = track.steps?.[actualStepIndex] || { active: false, note: track.defaultNote || 'C4', velocity: 0.8, duration: '16n', offset: 0 };

@@ -290,7 +290,7 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
       bitcrusherRef.current.wet.value = 0;
       chorusRef.current = new Tone.Chorus(4, 2.5, 0.5).start().connect(bitcrusherRef.current);
       chorusRef.current.wet.value = 0;
-      phaserRef.current = new Tone.Phaser({ frequency: 15, octaves: 5, baseFrequency: 1000 }).connect(chorusRef.current);
+      phaserRef.current = new Tone.Phaser({ frequency: 15, octaves: 3, baseFrequency: 300 }).connect(chorusRef.current);
       phaserRef.current.wet.value = 0;
       autoFilterRef.current = new Tone.AutoFilter("4n").start().connect(phaserRef.current);
       autoFilterRef.current.wet.value = 0;
@@ -389,7 +389,10 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
   }, [ready, masterVolume, headphoneMode, eqHigh, eqLow]);
 
   useEffect(() => {
-    if (filterRef.current) filterRef.current.Q.value = filterRes;
+    if (filterRef.current) {
+      filterRef.current.frequency.value = filterFreq;
+      filterRef.current.Q.value = filterRes;
+    }
     if (reverbRef.current) reverbRef.current.wet.value = fxReverb;
     if (delayRef.current) delayRef.current.wet.value = fxDelay;
     if (distRef.current) distRef.current.wet.value = fxDist;
@@ -562,6 +565,7 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
         const filter = new Tone.Filter(filterFreq, "lowpass").connect(eq);
         filter.Q.value = filterRes;
         const reverb = new Tone.Reverb({ decay: 2, wet: fxReverb }).connect(filter);
+        await reverb.generate();
         const delay = new Tone.FeedbackDelay("8n", 0.5).connect(reverb);
         delay.wet.value = fxDelay;
         const dist = new Tone.Distortion({ distortion: 0.8, wet: fxDist }).connect(delay);
@@ -569,7 +573,7 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
         bitcrusher.wet.value = fxBitcrush;
         const chorus = new Tone.Chorus(4, 2.5, 0.5).start().connect(bitcrusher);
         chorus.wet.value = fxChorus;
-        const phaser = new Tone.Phaser({ frequency: 15, octaves: 5, baseFrequency: 1000 }).connect(chorus);
+        const phaser = new Tone.Phaser({ frequency: 15, octaves: 3, baseFrequency: 300 }).connect(chorus);
         phaser.wet.value = fxPhaser;
         const autoFilter = new Tone.AutoFilter("4n").start().connect(phaser);
         autoFilter.wet.value = fxAutoFilter;
@@ -690,6 +694,7 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
         const filter = new Tone.Filter(filterFreq, "lowpass").connect(eq);
         filter.Q.value = filterRes;
         const reverb = new Tone.Reverb({ decay: 2, wet: fxReverb }).connect(filter);
+        await reverb.generate();
         const delay = new Tone.FeedbackDelay("8n", 0.5).connect(reverb);
         delay.wet.value = fxDelay;
         const dist = new Tone.Distortion({ distortion: 0.8, wet: fxDist }).connect(delay);
@@ -697,7 +702,7 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
         bitcrusher.wet.value = fxBitcrush;
         const chorus = new Tone.Chorus(4, 2.5, 0.5).start().connect(bitcrusher);
         chorus.wet.value = fxChorus;
-        const phaser = new Tone.Phaser({ frequency: 15, octaves: 5, baseFrequency: 1000 }).connect(chorus);
+        const phaser = new Tone.Phaser({ frequency: 15, octaves: 3, baseFrequency: 300 }).connect(chorus);
         phaser.wet.value = fxPhaser;
         const autoFilter = new Tone.AutoFilter("4n").start().connect(phaser);
         autoFilter.wet.value = fxAutoFilter;
