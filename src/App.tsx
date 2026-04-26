@@ -1162,7 +1162,7 @@ export default function App() {
     try {
       // 1. Stop and Clean House
       Tone.Transport.stop();
-      Tone.Transport.cancel(); // Remove all scheduled events
+      Tone.Draw.cancel(); // Prevent pending visual updates
       setPlaying(false);
       stepRef.current = 0;
       
@@ -1183,7 +1183,10 @@ export default function App() {
         setBpm(isNaN(bpmVal) ? 120 : Math.max(40, Math.min(300, bpmVal)));
       }
       
-      const loadedBars = Math.max(1, Math.min(128, Number(project.bars || 1)));
+      const safeNum = (val: any, fallback: number) => { const n = Number(val); return isNaN(n) ? fallback : n; };
+      
+      const parsedBars = Number(project.bars);
+      const loadedBars = isNaN(parsedBars) ? 1 : Math.max(1, Math.min(128, parsedBars));
       setBars(loadedBars);
       
       if (project.metronome !== undefined) setMetronome(!!project.metronome);
@@ -1192,20 +1195,20 @@ export default function App() {
       if (project.performanceMode !== undefined) setPerformanceMode(!!project.performanceMode);
       if (project.trackFollow !== undefined) setTrackFollow(!!project.trackFollow);
       
-      setSwing(Number(project.swing || 0));
-      setDelayWet(Number(project.delayWet || 0));
+      setSwing(safeNum(project.swing, 0));
+      setDelayWet(safeNum(project.delayWet, 0));
       setDelayTime(String(project.delayTime || '8n'));
-      setReverbWet(Number(project.reverbWet || 0));
-      setDistWet(Number(project.distWet || 0));
-      setMasterChorusWet(Number(project.masterChorusWet || 0));
-      setMasterBitcrusherWet(Number(project.masterBitcrusherWet || 0));
-      setMasterVolume(Number(project.masterVolume || 0));
-      setMasterCompThreshold(Number(project.masterCompThreshold || -24));
-      setMasterCompRatio(Number(project.masterCompRatio || 4));
-      setMasterEqLow(Number(project.masterEqLow || 0));
-      setMasterEqMid(Number(project.masterEqMid || 0));
-      setMasterEqHigh(Number(project.masterEqHigh || 0));
-      setMasterFilterFreq(Number(project.masterFilterFreq || 20000));
+      setReverbWet(safeNum(project.reverbWet, 0));
+      setDistWet(safeNum(project.distWet, 0));
+      setMasterChorusWet(safeNum(project.masterChorusWet, 0));
+      setMasterBitcrusherWet(safeNum(project.masterBitcrusherWet, 0));
+      setMasterVolume(safeNum(project.masterVolume, 0));
+      setMasterCompThreshold(safeNum(project.masterCompThreshold, -24));
+      setMasterCompRatio(safeNum(project.masterCompRatio, 4));
+      setMasterEqLow(safeNum(project.masterEqLow, 0));
+      setMasterEqMid(safeNum(project.masterEqMid, 0));
+      setMasterEqHigh(safeNum(project.masterEqHigh, 0));
+      setMasterFilterFreq(safeNum(project.masterFilterFreq, 20000));
       
       // 4. Robust Track Loading & Sanitization
       if (project.tracks && Array.isArray(project.tracks)) {
@@ -1213,7 +1216,7 @@ export default function App() {
           // Guarantee valid defaults for everything
           const trackId = track.id || Math.random().toString(36).substring(2, 9);
           const defaultNote = track.defaultNote || 'C4';
-          const targetLength = track.stepsCount || loadedBars * 16;
+          const targetLength = Number(track.stepsCount) || loadedBars * 16;
           
           let rawSteps = Array.isArray(track.steps) ? track.steps : [];
           let sanitizedSteps = rawSteps.map((step: any) => ({
@@ -1248,18 +1251,26 @@ export default function App() {
             muted: !!track.muted,
             solo: !!track.solo,
             defaultNote: defaultNote,
-            delayWet: Number(track.delayWet || 0),
-            reverbWet: Number(track.reverbWet || 0),
-            distWet: Number(track.distWet || 0),
-            chorusWet: Number(track.chorusWet || 0),
-            bitcrusherWet: Number(track.bitcrusherWet || 0),
-            filterCutoff: Number(track.filterCutoff || 20000),
-            filterResonance: Number(track.filterResonance || 0),
-            drive: Number(track.drive || 0),
-            lfoRate: Number(track.lfoRate || 0),
-            ampMod: Number(track.ampMod || 0),
+            delayWet: safeNum(track.delayWet, 0),
+            reverbWet: safeNum(track.reverbWet, 0),
+            distWet: safeNum(track.distWet, 0),
+            chorusWet: safeNum(track.chorusWet, 0),
+            bitcrusherWet: safeNum(track.bitcrusherWet, 0),
+            filterCutoff: safeNum(track.filterCutoff, 20000),
+            filterResonance: safeNum(track.filterResonance, 0),
+            drive: safeNum(track.drive, 0),
+            lfoRate: safeNum(track.lfoRate, 0),
+            ampMod: safeNum(track.ampMod, 0),
+            sampleStart: safeNum(track.sampleStart, 0),
+            sampleEnd: safeNum(track.sampleEnd, 0),
+            sampleDuration: safeNum(track.sampleDuration, 1),
+            samplePlaybackSpeed: safeNum(track.samplePlaybackSpeed, 1),
+            sampleFade: track.sampleFade !== false,
+            sampleReverse: !!track.sampleReverse,
+            sampleRootNote: track.sampleRootNote || 'C4',
+            sampleUrl: track.sampleUrl,
             steps: sanitizedSteps,
-            stepsCount: targetLength
+            stepsCount: safeNum(targetLength, loadedBars * 16)
           };
         });
         
@@ -1272,17 +1283,17 @@ export default function App() {
 
       // Re-apply master settings to the engine just in case
       engine.setMasterFX(
-        Number(project.delayWet || 0),
+        safeNum(project.delayWet, 0),
         String(project.delayTime || '8n'),
-        Number(project.reverbWet || 0),
-        Number(project.distWet || 0),
-        Number(project.masterChorusWet || 0),
-        Number(project.masterBitcrusherWet || 0),
-        Number(project.masterVolume || 0),
-        Number(project.masterEqLow || 0),
-        Number(project.masterEqMid || 0),
-        Number(project.masterEqHigh || 0),
-        Number(project.masterFilterFreq || 20000)
+        safeNum(project.reverbWet, 0),
+        safeNum(project.distWet, 0),
+        safeNum(project.masterChorusWet, 0),
+        safeNum(project.masterBitcrusherWet, 0),
+        safeNum(project.masterVolume, 0),
+        safeNum(project.masterEqLow, 0),
+        safeNum(project.masterEqMid, 0),
+        safeNum(project.masterEqHigh, 0),
+        safeNum(project.masterFilterFreq, 20000)
       );
 
     } catch (err: any) {
