@@ -283,7 +283,6 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
       eqRef.current = new Tone.EQ3(0, 0, 0).connect(compRef.current);
       filterRef.current = new Tone.Filter(20000, "lowpass").connect(eqRef.current);
       reverbRef.current = new Tone.Reverb({ decay: 2, wet: 0 }).connect(filterRef.current);
-      await reverbRef.current.generate();
       delayRef.current = new Tone.FeedbackDelay("8n", 0.5).connect(reverbRef.current);
       delayRef.current.wet.value = 0;
       distRef.current = new Tone.Distortion({ distortion: 0.8, wet: 0 }).connect(delayRef.current);
@@ -390,10 +389,7 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
   }, [ready, masterVolume, headphoneMode, eqHigh, eqLow]);
 
   useEffect(() => {
-    if (filterRef.current) {
-      filterRef.current.frequency.value = filterFreq;
-      filterRef.current.Q.value = filterRes;
-    }
+    if (filterRef.current) filterRef.current.Q.value = filterRes;
     if (reverbRef.current) reverbRef.current.wet.value = fxReverb;
     if (delayRef.current) delayRef.current.wet.value = fxDelay;
     if (distRef.current) distRef.current.wet.value = fxDist;
@@ -566,7 +562,6 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
         const filter = new Tone.Filter(filterFreq, "lowpass").connect(eq);
         filter.Q.value = filterRes;
         const reverb = new Tone.Reverb({ decay: 2, wet: fxReverb }).connect(filter);
-        await reverb.generate();
         const delay = new Tone.FeedbackDelay("8n", 0.5).connect(reverb);
         delay.wet.value = fxDelay;
         const dist = new Tone.Distortion({ distortion: 0.8, wet: fxDist }).connect(delay);
@@ -695,7 +690,6 @@ export default function SFXStudio({ onBack, onAddToMIDI }: SFXStudioProps) {
         const filter = new Tone.Filter(filterFreq, "lowpass").connect(eq);
         filter.Q.value = filterRes;
         const reverb = new Tone.Reverb({ decay: 2, wet: fxReverb }).connect(filter);
-        await reverb.generate();
         const delay = new Tone.FeedbackDelay("8n", 0.5).connect(reverb);
         delay.wet.value = fxDelay;
         const dist = new Tone.Distortion({ distortion: 0.8, wet: fxDist }).connect(delay);
