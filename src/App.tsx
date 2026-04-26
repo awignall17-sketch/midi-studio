@@ -417,9 +417,20 @@ export default function App() {
 
   useEffect(() => {
     // Small delay to ensure DOM is rendered before calculating offsets
-    const timer = setTimeout(updateStepOffsets, 1000);
-    return () => clearTimeout(timer);
-  }, [updateStepOffsets, tracks.length, bars]);
+    const timer = setTimeout(updateStepOffsets, 500);
+    
+    const handleResize = () => {
+      // Debounce resize offset calculation
+      clearTimeout(timer);
+      setTimeout(updateStepOffsets, 100);
+    };
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [updateStepOffsets, tracks.length, bars, zoom]);
 
   useEffect(() => {
     if (!started) return;
@@ -560,8 +571,8 @@ export default function App() {
     setPlaying(false);
     stepRef.current = 0;
     
-    // Ensure visually playhead resets using requestAnimationFrame so any pending draws don't override this
-    requestAnimationFrame(() => {
+    // Ensure visually playhead resets aggressively against pending frame loops
+    const resetVisuals = () => {
       const globalPlayhead = document.getElementById('global-playhead');
       if (globalPlayhead) {
         const offset = stepOffsetsRef.current[0];
@@ -579,10 +590,13 @@ export default function App() {
         
         const container = globalPlayhead.closest('.custom-scrollbar');
         if (container) {
-          container.scrollTo({ left: 0, behavior: 'smooth' });
+          container.scrollTo({ left: 0, behavior: 'auto' });
         }
       }
-    });
+    };
+    
+    requestAnimationFrame(resetVisuals);
+    setTimeout(resetVisuals, 50);
   };
 
   const toggleRecording = async () => {
@@ -1856,11 +1870,42 @@ export default function App() {
                 </div>
               </div>
 
-              {React.useMemo(() => (
-                <AnimatePresence mode="popLayout">
-                  {tracks.map((track, trackIndex) => (
-                    <div key={track.id}>
-                      {performanceMode ? (
+              <AnimatePresence mode="popLayout">
+                {tracks.map((track, trackIndex) => (
+                  <div key={track.id}>
+                    {performanceMode ? (
+                      <TrackRow
+                        track={track}
+                        trackIndex={trackIndex}
+                        totalTracks={tracks.length}
+                        bars={bars}
+                        onUpdateTrack={updateTrack}
+                        onMoveTrackUp={moveTrackUp}
+                        onMoveTrackDown={moveTrackDown}
+                        onToggleMute={toggleMute}
+                        onToggleSolo={toggleSolo}
+                        onShiftTrackLeft={shiftTrackLeft}
+                        onShiftTrackRight={shiftTrackRight}
+                        onDuplicateTrack={duplicateTrack}
+                        onRandomizeTrack={randomizeTrack}
+                        onHumanizeTrack={humanizeTrack}
+                        onClearTrack={clearTrack}
+                        onDeleteTrack={deleteTrack}
+                        onSampleUpload={handleSampleUpload}
+                        onCommitHistory={commitHistory}
+                        onToggleStep={toggleStep}
+                        onOpenSettings={handleOpenSettings}
+                        onOpenAdvanced={(idx) => setAdvancedSettingsModal(idx)}
+                        zoom={zoom}
+                      />
+                    ) : (
+                      <motion.div 
+                        layout 
+                        initial={{ opacity: 0, y: 20 }} 
+                        animate={{ opacity: 1, y: 0 }} 
+                        exit={{ opacity: 0, scale: 0.9 }} 
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                      >
                         <TrackRow
                           track={track}
                           trackIndex={trackIndex}
@@ -1885,44 +1930,11 @@ export default function App() {
                           onOpenAdvanced={(idx) => setAdvancedSettingsModal(idx)}
                           zoom={zoom}
                         />
-                      ) : (
-                        <motion.div 
-                          layout 
-                          initial={{ opacity: 0, y: 20 }} 
-                          animate={{ opacity: 1, y: 0 }} 
-                          exit={{ opacity: 0, scale: 0.9 }} 
-                          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                        >
-                          <TrackRow
-                            track={track}
-                            trackIndex={trackIndex}
-                            totalTracks={tracks.length}
-                            bars={bars}
-                            onUpdateTrack={updateTrack}
-                            onMoveTrackUp={moveTrackUp}
-                            onMoveTrackDown={moveTrackDown}
-                            onToggleMute={toggleMute}
-                            onToggleSolo={toggleSolo}
-                            onShiftTrackLeft={shiftTrackLeft}
-                            onShiftTrackRight={shiftTrackRight}
-                            onDuplicateTrack={duplicateTrack}
-                            onRandomizeTrack={randomizeTrack}
-                            onHumanizeTrack={humanizeTrack}
-                            onClearTrack={clearTrack}
-                            onDeleteTrack={deleteTrack}
-                            onSampleUpload={handleSampleUpload}
-                            onCommitHistory={commitHistory}
-                            onToggleStep={toggleStep}
-                            onOpenSettings={handleOpenSettings}
-                            onOpenAdvanced={(idx) => setAdvancedSettingsModal(idx)}
-                            zoom={zoom}
-                          />
-                        </motion.div>
-                      )}
-                    </div>
-                  ))}
-                </AnimatePresence>
-              ), [tracks, bars, performanceMode, zoom, updateTrack, moveTrackUp, moveTrackDown, toggleMute, toggleSolo, shiftTrackLeft, shiftTrackRight, duplicateTrack, randomizeTrack, humanizeTrack, clearTrack, deleteTrack, handleSampleUpload, commitHistory, toggleStep, handleOpenSettings])}
+                      </motion.div>
+                    )}
+                  </div>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
           <div className="p-3 bg-[#151619] border-t border-[#2a2b30] flex gap-2">
