@@ -438,7 +438,7 @@ export default function App() {
     const currentTotalSteps = bars * 16;
     Tone.Transport.loop = true;
     Tone.Transport.loopStart = 0;
-    Tone.Transport.loopEnd = bars * Tone.Time('1m').toSeconds();
+    Tone.Transport.loopEnd = `${bars}m`;
 
     const repeatEventId = Tone.Transport.scheduleRepeat((time) => {
       // Use ticks for perfect synchronization even during tempo changes
@@ -451,7 +451,8 @@ export default function App() {
       }
 
       const hasSolo = tracksRef.current.some(t => t.solo);
-      const stepDuration = Tone.Time('16n').toSeconds();
+      const currentBpm = Tone.Transport.bpm.value || 120;
+      const stepDuration = 60 / currentBpm / 4;
 
       tracksRef.current.forEach(track => {
         if (track.muted) return;
@@ -519,7 +520,7 @@ export default function App() {
             const globalPlayhead = document.getElementById('global-playhead');
             if (globalPlayhead) globalPlayhead.style.transform = 'translateX(-1000px)';
             stepRef.current = 0;
-          }, time + Tone.Time('16n').toSeconds());
+          }, time + stepDuration);
         }
         
         if (recordingRef.current && autoStopRecordRef.current) {
@@ -527,7 +528,7 @@ export default function App() {
             const blob = await engine.stopRecording();
             setRecordedBlob(blob);
             setRecording(false);
-          }, time + Tone.Time('16n').toSeconds());
+          }, time + stepDuration);
         }
       }
       
