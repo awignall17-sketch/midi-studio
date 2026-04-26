@@ -9,13 +9,13 @@ class AudioEngine {
   masterHPF: Tone.Filter;
   stereoWidener: Tone.StereoWidener;
   delay: Tone.FeedbackDelay | null = null;
-  reverb: Tone.Freeverb | null = null;
+  reverb: Tone.Reverb | null = null;
   distortion: Tone.Distortion | null = null;
   chorus: Tone.Chorus | null = null;
   bitcrusher: Tone.BitCrusher | null = null;
   metronome: Tone.MembraneSynth | null = null;
   
-  trackFX: Record<string, { dist: Tone.Distortion, delay: Tone.FeedbackDelay, reverb: Tone.Freeverb, chorus: Tone.Chorus, bitcrusher: Tone.BitCrusher, filter: Tone.Filter, tremolo: Tone.Tremolo, channel: Tone.Channel }> = {};
+  trackFX: Record<string, { dist: Tone.Distortion, delay: Tone.FeedbackDelay, reverb: Tone.Reverb, chorus: Tone.Chorus, bitcrusher: Tone.BitCrusher, filter: Tone.Filter, tremolo: Tone.Tremolo, channel: Tone.Channel }> = {};
   trackInstruments: Record<string, any> = {};
   
   recorder: MediaRecorder | null = null;
@@ -32,10 +32,10 @@ class AudioEngine {
     this.masterCompressor = new Tone.Compressor({
       threshold: -24,
       ratio: 4,
-      attack: 0.01,
-      release: 0.1
+      attack: 0.003,
+      release: 0.25
     });
-    this.masterLimiter = new Tone.Limiter(-2);
+    this.masterLimiter = new Tone.Limiter(-0.1);
     this.masterVol = new Tone.Volume(0).connect(this.masterHPF);
     this.masterHPF.connect(this.masterFilter);
     this.masterFilter.connect(this.masterEQ);
@@ -63,7 +63,7 @@ class AudioEngine {
     }
 
     this.delay = new Tone.FeedbackDelay("8n", 0.3);
-    this.reverb = new Tone.Freeverb(0.8, 4000);
+    this.reverb = new Tone.Reverb(2.5);
     this.distortion = new Tone.Distortion(0.5);
     this.chorus = new Tone.Chorus(4, 2.5, 0.5).start();
     this.bitcrusher = new Tone.BitCrusher(8);
@@ -228,7 +228,7 @@ class AudioEngine {
       const tremolo = new Tone.Tremolo(0, 0).start();
       const dist = new Tone.Distortion(0.5);
       const delay = new Tone.FeedbackDelay("8n", 0.3);
-      const reverb = new Tone.Freeverb(0.8, 4000);
+      const reverb = new Tone.Reverb(2.5);
       const chorus = new Tone.Chorus(4, 2.5, 0.5).start();
       const bitcrusher = new Tone.BitCrusher(8);
       const channel = new Tone.Channel().connect(this.bitcrusher!);
@@ -245,8 +245,8 @@ class AudioEngine {
     }
     
     const fx = this.trackFX[trackId];
-    // Lower gain automatically by 14dB internally to guarantee massive mix headroom
-    fx.channel.volume.rampTo(volume - 14, 0.1);
+    // Lower gain automatically by 10dB internally to guarantee massive mix headroom
+    fx.channel.volume.rampTo(volume - 10, 0.1);
     fx.channel.pan.rampTo(pan, 0.1);
     fx.channel.mute = muted;
     fx.delay.wet.rampTo(delayWet, 0.1);
@@ -345,14 +345,9 @@ class AudioEngine {
     const inst = this.trackInstruments[trackId];
     if (!inst) return;
 
-    const currentBpm = Tone.Transport.bpm.value || 120;
-    const stepDuration = 60 / currentBpm / 4;
-    const t = (time !== undefined ? time : Tone.now() + 0.02) + (offset * stepDuration);
+    const t = (time !== undefined ? time : Tone.now() + 0.02) + (offset * Tone.Time('16n').toSeconds());
     
-    // Quick caching for noise instruments
-    const isNoise = inst._isNoise !== undefined ? inst._isNoise : 
-      (inst.name === 'NoiseSynth' || inst.name === 'MetalSynth' || inst instanceof Tone.NoiseSynth || inst instanceof Tone.MetalSynth);
-    inst._isNoise = isNoise;
+    const isNoise = inst.name === 'NoiseSynth' || inst.name === 'MetalSynth' || inst instanceof Tone.NoiseSynth || inst instanceof Tone.MetalSynth;
     
     if (inst instanceof Tone.Player || inst.name === 'Player') {
       if (inst.loaded) {

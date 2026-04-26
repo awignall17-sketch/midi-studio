@@ -413,7 +413,77 @@ export default function App() {
       }
     }
     stepOffsetsRef.current = offsets;
-  }, [bars]);
+    
+    // Park playhead at offset 0 if not playing
+    if (!playing) {
+      const globalPlayhead = document.getElementById('global-playhead');
+      if (globalPlayhead && offsets.length > 0) {
+        globalPlayhead.style.transform = `translateX(${offsets[0]}px)`;
+      }
+    }
+  }, [bars, playing]);
+
+  useEffect(() => {
+    let animationFrameId: number;
+
+    const smoothPlayhead = () => {
+      if (!playing || performanceMode) return;
+
+      const globalPlayhead = document.getElementById('global-playhead');
+      if (globalPlayhead && stepOffsetsRef.current.length > 0) {
+        // Use Tone.now() to get highly precise real-time position
+        const currentTicks = Tone.Transport.getTicksAtTime(Tone.now());
+        const ticksPer16n = Tone.Transport.PPQ / 4;
+        const totalSteps = bars * 16;
+        
+        let exactStepFloat = currentTicks / ticksPer16n;
+        // ensure it loops within totalSteps
+        exactStepFloat = ((exactStepFloat % totalSteps) + totalSteps) % totalSteps;
+        
+        const previousStepIndex = Math.floor(exactStepFloat);
+        const fraction = exactStepFloat - previousStepIndex;
+        
+        const offsetLeft = stepOffsetsRef.current[previousStepIndex];
+        let interpolated = offsetLeft;
+
+        if (offsetLeft !== undefined) {
+           const nextStepIndex = previousStepIndex + 1;
+           if (nextStepIndex < totalSteps && stepOffsetsRef.current[nextStepIndex] !== undefined) {
+             const offsetRight = stepOffsetsRef.current[nextStepIndex];
+             interpolated = offsetLeft + (offsetRight - offsetLeft) * fraction;
+           } else {
+             const prevStepWidth = (stepOffsetsRef.current[previousStepIndex] || 40) - (stepOffsetsRef.current[previousStepIndex - 1] || 0);
+             interpolated = offsetLeft + (prevStepWidth > 0 ? prevStepWidth : 40) * fraction;
+           }
+
+           globalPlayhead.style.transform = `translateX(${interpolated}px)`;
+
+           if (trackFollowRef.current) {
+              const container = globalPlayhead.closest('.custom-scrollbar');
+              if (container) {
+                const containerWidth = container.clientWidth;
+                // scroll auto-following
+                if (containerWidth > 0) {
+                  container.scrollTo({ left: interpolated - containerWidth / 2, behavior: 'auto' });
+                }
+              }
+           }
+        }
+      }
+      
+      animationFrameId = requestAnimationFrame(smoothPlayhead);
+    };
+
+    if (playing && !performanceMode) {
+      animationFrameId = requestAnimationFrame(smoothPlayhead);
+    }
+
+    return () => {
+      if (animationFrameId !== undefined) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [playing, performanceMode, bars]);
 
   useEffect(() => {
     // Small delay to ensure DOM is rendered before calculating offsets
@@ -438,7 +508,7 @@ export default function App() {
     const currentTotalSteps = bars * 16;
     Tone.Transport.loop = true;
     Tone.Transport.loopStart = 0;
-    Tone.Transport.loopEnd = `${bars}m`;
+    Tone.Transport.loopEnd = bars * Tone.Time('1m').toSeconds();
 
     const repeatEventId = Tone.Transport.scheduleRepeat((time) => {
       // Use ticks for perfect synchronization even during tempo changes
@@ -451,8 +521,7 @@ export default function App() {
       }
 
       const hasSolo = tracksRef.current.some(t => t.solo);
-      const currentBpm = Tone.Transport.bpm.value || 120;
-      const stepDuration = 60 / currentBpm / 4;
+      const stepDuration = Tone.Time('16n').toSeconds();
 
       tracksRef.current.forEach(track => {
         if (track.muted) return;
@@ -473,44 +542,6 @@ export default function App() {
         }
       });
       
-      if (!performanceModeRef.current) {
-        Tone.Draw.schedule(() => {
-          const globalPlayhead = document.getElementById('global-playhead');
-          if (!globalPlayhead) return;
-
-          const offset = stepOffsetsRef.current[currentStepIndex];
-          if (offset !== undefined) {
-            globalPlayhead.style.transform = `translateX(${offset}px)`;
-            
-            if (trackFollowRef.current) {
-              const container = globalPlayhead.closest('.custom-scrollbar');
-              if (container) {
-                const containerWidth = container.clientWidth;
-                const scrollLeft = offset - containerWidth / 2;
-                container.scrollTo({ left: scrollLeft, behavior: 'auto' });
-              }
-            }
-          } else {
-            // Fallback if offsets aren't ready
-            const nextEls = document.getElementsByClassName(`step-container-${currentStepIndex}`);
-            if (nextEls.length > 0) {
-              const el = nextEls[0] as HTMLElement;
-              const elLeft = el.offsetLeft + el.offsetWidth / 2;
-              globalPlayhead.style.transform = `translateX(${elLeft}px)`;
-              
-              if (trackFollowRef.current) {
-                const container = globalPlayhead.closest('.custom-scrollbar');
-                if (container) {
-                  const containerWidth = container.clientWidth;
-                  const scrollLeft = elLeft - containerWidth / 2;
-                  container.scrollTo({ left: scrollLeft, behavior: 'auto' });
-                }
-              }
-            }
-          }
-        }, time);
-      }
-      
       if (currentStepIndex === currentTotalSteps - 1) {
         if (!loopPlaybackRef.current) {
           Tone.Draw.schedule(() => {
@@ -518,9 +549,15 @@ export default function App() {
             Tone.Draw.cancel();
             setPlaying(false);
             const globalPlayhead = document.getElementById('global-playhead');
-            if (globalPlayhead) globalPlayhead.style.transform = 'translateX(-1000px)';
+            if (globalPlayhead) {
+              if (stepOffsetsRef.current && stepOffsetsRef.current.length > 0) {
+                globalPlayhead.style.transform = `translateX(${stepOffsetsRef.current[0]}px)`;
+              } else {
+                globalPlayhead.style.transform = `translateX(-1000px)`;
+              }
+            }
             stepRef.current = 0;
-          }, time + stepDuration);
+          }, time + Tone.Time('16n').toSeconds());
         }
         
         if (recordingRef.current && autoStopRecordRef.current) {
@@ -528,7 +565,7 @@ export default function App() {
             const blob = await engine.stopRecording();
             setRecordedBlob(blob);
             setRecording(false);
-          }, time + stepDuration);
+          }, time + Tone.Time('16n').toSeconds());
         }
       }
       
@@ -576,17 +613,10 @@ export default function App() {
     const resetVisuals = () => {
       const globalPlayhead = document.getElementById('global-playhead');
       if (globalPlayhead) {
-        const offset = stepOffsetsRef.current[0];
-        if (offset !== undefined) {
-          globalPlayhead.style.transform = `translateX(${offset}px)`;
+        if (stepOffsetsRef.current && stepOffsetsRef.current.length > 0) {
+          globalPlayhead.style.transform = `translateX(${stepOffsetsRef.current[0]}px)`;
         } else {
-          const firstEls = document.getElementsByClassName('step-container-0');
-          if (firstEls.length > 0) {
-            const el = firstEls[0] as HTMLElement;
-            globalPlayhead.style.transform = `translateX(${el.offsetLeft + el.offsetWidth / 2}px)`;
-          } else {
-            globalPlayhead.style.transform = 'translateX(-1000px)';
-          }
+          globalPlayhead.style.transform = `translateX(-1000px)`;
         }
         
         const container = globalPlayhead.closest('.custom-scrollbar');
@@ -1162,7 +1192,7 @@ export default function App() {
     try {
       // 1. Stop and Clean House
       Tone.Transport.stop();
-      Tone.Draw.cancel(); // Prevent pending visual updates
+      Tone.Transport.cancel(); // Remove all scheduled events
       setPlaying(false);
       stepRef.current = 0;
       
@@ -1183,10 +1213,7 @@ export default function App() {
         setBpm(isNaN(bpmVal) ? 120 : Math.max(40, Math.min(300, bpmVal)));
       }
       
-      const safeNum = (val: any, fallback: number) => { const n = Number(val); return isNaN(n) ? fallback : n; };
-      
-      const parsedBars = Number(project.bars);
-      const loadedBars = isNaN(parsedBars) ? 1 : Math.max(1, Math.min(128, parsedBars));
+      const loadedBars = Math.max(1, Math.min(128, Number(project.bars || 1)));
       setBars(loadedBars);
       
       if (project.metronome !== undefined) setMetronome(!!project.metronome);
@@ -1195,20 +1222,20 @@ export default function App() {
       if (project.performanceMode !== undefined) setPerformanceMode(!!project.performanceMode);
       if (project.trackFollow !== undefined) setTrackFollow(!!project.trackFollow);
       
-      setSwing(safeNum(project.swing, 0));
-      setDelayWet(safeNum(project.delayWet, 0));
+      setSwing(Number(project.swing || 0));
+      setDelayWet(Number(project.delayWet || 0));
       setDelayTime(String(project.delayTime || '8n'));
-      setReverbWet(safeNum(project.reverbWet, 0));
-      setDistWet(safeNum(project.distWet, 0));
-      setMasterChorusWet(safeNum(project.masterChorusWet, 0));
-      setMasterBitcrusherWet(safeNum(project.masterBitcrusherWet, 0));
-      setMasterVolume(safeNum(project.masterVolume, 0));
-      setMasterCompThreshold(safeNum(project.masterCompThreshold, -24));
-      setMasterCompRatio(safeNum(project.masterCompRatio, 4));
-      setMasterEqLow(safeNum(project.masterEqLow, 0));
-      setMasterEqMid(safeNum(project.masterEqMid, 0));
-      setMasterEqHigh(safeNum(project.masterEqHigh, 0));
-      setMasterFilterFreq(safeNum(project.masterFilterFreq, 20000));
+      setReverbWet(Number(project.reverbWet || 0));
+      setDistWet(Number(project.distWet || 0));
+      setMasterChorusWet(Number(project.masterChorusWet || 0));
+      setMasterBitcrusherWet(Number(project.masterBitcrusherWet || 0));
+      setMasterVolume(Number(project.masterVolume || 0));
+      setMasterCompThreshold(Number(project.masterCompThreshold || -24));
+      setMasterCompRatio(Number(project.masterCompRatio || 4));
+      setMasterEqLow(Number(project.masterEqLow || 0));
+      setMasterEqMid(Number(project.masterEqMid || 0));
+      setMasterEqHigh(Number(project.masterEqHigh || 0));
+      setMasterFilterFreq(Number(project.masterFilterFreq || 20000));
       
       // 4. Robust Track Loading & Sanitization
       if (project.tracks && Array.isArray(project.tracks)) {
@@ -1216,7 +1243,7 @@ export default function App() {
           // Guarantee valid defaults for everything
           const trackId = track.id || Math.random().toString(36).substring(2, 9);
           const defaultNote = track.defaultNote || 'C4';
-          const targetLength = Number(track.stepsCount) || loadedBars * 16;
+          const targetLength = track.stepsCount || loadedBars * 16;
           
           let rawSteps = Array.isArray(track.steps) ? track.steps : [];
           let sanitizedSteps = rawSteps.map((step: any) => ({
@@ -1251,26 +1278,18 @@ export default function App() {
             muted: !!track.muted,
             solo: !!track.solo,
             defaultNote: defaultNote,
-            delayWet: safeNum(track.delayWet, 0),
-            reverbWet: safeNum(track.reverbWet, 0),
-            distWet: safeNum(track.distWet, 0),
-            chorusWet: safeNum(track.chorusWet, 0),
-            bitcrusherWet: safeNum(track.bitcrusherWet, 0),
-            filterCutoff: safeNum(track.filterCutoff, 20000),
-            filterResonance: safeNum(track.filterResonance, 0),
-            drive: safeNum(track.drive, 0),
-            lfoRate: safeNum(track.lfoRate, 0),
-            ampMod: safeNum(track.ampMod, 0),
-            sampleStart: safeNum(track.sampleStart, 0),
-            sampleEnd: safeNum(track.sampleEnd, 0),
-            sampleDuration: safeNum(track.sampleDuration, 1),
-            samplePlaybackSpeed: safeNum(track.samplePlaybackSpeed, 1),
-            sampleFade: track.sampleFade !== false,
-            sampleReverse: !!track.sampleReverse,
-            sampleRootNote: track.sampleRootNote || 'C4',
-            sampleUrl: track.sampleUrl,
+            delayWet: Number(track.delayWet || 0),
+            reverbWet: Number(track.reverbWet || 0),
+            distWet: Number(track.distWet || 0),
+            chorusWet: Number(track.chorusWet || 0),
+            bitcrusherWet: Number(track.bitcrusherWet || 0),
+            filterCutoff: Number(track.filterCutoff || 20000),
+            filterResonance: Number(track.filterResonance || 0),
+            drive: Number(track.drive || 0),
+            lfoRate: Number(track.lfoRate || 0),
+            ampMod: Number(track.ampMod || 0),
             steps: sanitizedSteps,
-            stepsCount: safeNum(targetLength, loadedBars * 16)
+            stepsCount: targetLength
           };
         });
         
@@ -1283,17 +1302,17 @@ export default function App() {
 
       // Re-apply master settings to the engine just in case
       engine.setMasterFX(
-        safeNum(project.delayWet, 0),
+        Number(project.delayWet || 0),
         String(project.delayTime || '8n'),
-        safeNum(project.reverbWet, 0),
-        safeNum(project.distWet, 0),
-        safeNum(project.masterChorusWet, 0),
-        safeNum(project.masterBitcrusherWet, 0),
-        safeNum(project.masterVolume, 0),
-        safeNum(project.masterEqLow, 0),
-        safeNum(project.masterEqMid, 0),
-        safeNum(project.masterEqHigh, 0),
-        safeNum(project.masterFilterFreq, 20000)
+        Number(project.reverbWet || 0),
+        Number(project.distWet || 0),
+        Number(project.masterChorusWet || 0),
+        Number(project.masterBitcrusherWet || 0),
+        Number(project.masterVolume || 0),
+        Number(project.masterEqLow || 0),
+        Number(project.masterEqMid || 0),
+        Number(project.masterEqHigh || 0),
+        Number(project.masterFilterFreq || 20000)
       );
 
     } catch (err: any) {
@@ -1863,8 +1882,8 @@ export default function App() {
                 <div className="flex items-center p-3 sm:p-4 bg-[#151619] relative">
                   <div 
                     id="global-playhead" 
-                    className="absolute top-0 bottom-[-10000px] w-0.5 bg-[#FF4444] shadow-[0_0_8px_#FF4444] z-10 pointer-events-none opacity-80"
-                    style={{ transform: 'translateX(-1000px)', willChange: 'transform' }} 
+                    className="absolute top-0 w-0.5 bg-[#FF4444] shadow-[0_0_8px_#FF4444] z-50 pointer-events-none opacity-80"
+                    style={{ height: '2000px', transform: 'translateX(-1000px)', willChange: 'transform' }} 
                   />
                   {Array.from({ length: bars * 16 }).map((_, stepIndex) => (
                     <React.Fragment key={stepIndex}>
